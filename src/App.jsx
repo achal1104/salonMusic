@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Play, Pause, SkipBack, SkipForward, Music2, Headphones, Radio } from "lucide-react";
 import STATIC_PLAYLIST from "./playlist.js";
 
-const API_BASE = "http://localhost:4000";
+const API_BASE = "https://rajkumar-salon-backend.onrender.com";
 const BACKGROUND_IMAGE = "/images/rajkumarsalon.jpg";
 
 const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
