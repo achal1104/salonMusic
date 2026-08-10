@@ -1,0 +1,637 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Poppins:wght@400;500;600;700&display=swap');
+
+:root {
+  --dx-ink: #0a1010;
+  --dx-amber: #f7c65a;
+  --dx-amber-soft: rgba(247, 198, 90, 0.85);
+  --dx-clay-1: #e8875a;
+  --dx-clay-2: #7a1f1f;
+  --dx-glass: rgba(14, 16, 18, 0.52);
+  --dx-glass-border: rgba(255, 255, 255, 0.11);
+  --dx-online: #4ade80;
+  --dx-radius-pill: 999px;
+  --dx-safe-b: env(safe-area-inset-bottom, 0px);
+  --dx-safe-t: env(safe-area-inset-top, 0px);
+  --dx-safe-l: env(safe-area-inset-left, 0px);
+  --dx-safe-r: env(safe-area-inset-right, 0px);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #root {
+  margin: 0; padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background: var(--dx-ink);
+}
+
+/* ── page shell — fills the whole viewport, dvh-aware for mobile browser chrome ── */
+.dx-page {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 100%;
+  overflow: hidden;
+  cursor: default;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+/* ── parallax background ── */
+.dx-bg {
+  position: absolute;
+  inset: -2%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  /* fluid fallback: interpolates smoothly across ANY width between steps below */
+  background-position: clamp(0%, calc(-40% + 15vw), 38%) 26%;
+  will-change: transform;
+  transition: transform 0.05s linear;
+  animation: dx-kenburns 30s ease-in-out infinite alternate;
+}
+
+@keyframes dx-kenburns {
+  0%   { transform: scale(1.02) translate(0px, 0px); }
+  100% { transform: scale(1.05) translate(-4px, -3px); }
+}
+
+/* ============ DESKTOP / LAPTOP ============ */
+@media (min-width: 1025px) {
+  .dx-bg { background-position: 38% 30%; }
+}
+@media (min-width: 1800px) {
+  .dx-bg { background-position: center 32%; }
+}
+
+/* ============ TABLETS (portrait + landscape, incl. iPad Pro / Air) ============ */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dx-bg { background-position: 32% 26%; }
+}
+@media (min-width: 641px) and (max-width: 820px) and (max-aspect-ratio: 3/4) {
+  .dx-bg { background-position: 20% 24%; }
+}
+/* larger tablets in landscape (iPad Pro 12.9", 1024–1366) */
+@media (min-width: 1025px) and (max-width: 1366px) and (max-height: 1024px) and (pointer: coarse) {
+  .dx-bg { background-position: 34% 28%; }
+}
+
+/* ============ PHONES — portrait, dense width steps ============ */
+/* covers virtually every Samsung/Vivo/Oppo/Xiaomi/OnePlus/Realme/iPhone width */
+@media (max-aspect-ratio: 4/5) {
+  .dx-bg { background-position: 8% 26%; }               /* generic fallback */
+}
+@media (max-width: 500px) and (min-width: 461px) { .dx-bg { background-position: 10% 26%; } } /* large phablets */
+@media (max-width: 460px) and (min-width: 431px) { .dx-bg { background-position: 7% 26%; } }  /* S24 Ultra, Vivo X/V-series large */
+@media (max-width: 430px) and (min-width: 415px) { .dx-bg { background-position: 5% 25%; } }  /* iPhone Pro Max, Vivo Y100 class */
+@media (max-width: 414px) and (min-width: 401px) { .dx-bg { background-position: 4% 25%; } }  /* Galaxy S20/S21+, Vivo V-series */
+@media (max-width: 400px) and (min-width: 391px) { .dx-bg { background-position: 3% 25%; } }  /* Galaxy S22/S23, Pixel */
+@media (max-width: 390px) and (min-width: 377px) { .dx-bg { background-position: 2% 24%; } }  /* iPhone 13-15, common Android */
+@media (max-width: 376px) and (min-width: 361px) { .dx-bg { background-position: 1% 24%; } }  /* Galaxy S8-S10, Vivo Y-series budget */
+@media (max-width: 360px) and (min-width: 341px) { .dx-bg { background-position: 0% 23%; } }  /* baseline Android (very common) */
+@media (max-width: 340px) and (min-width: 321px) { .dx-bg { background-position: 0% 22%; } }  /* compact/budget phones */
+@media (max-width: 320px) { .dx-bg { background-position: 0% 20%; } }                         /* smallest (SE, folds, entry Vivo Y) */
+/* very narrow folded phones (Galaxy Fold cover screen, ~280px) */
+@media (max-width: 290px) { .dx-bg { background-position: 0% 18%; } }
+
+/* ============ PHONES — landscape ============ */
+@media (max-height: 480px) and (orientation: landscape) {
+  .dx-bg { background-position: 25% 30%; }
+}
+@media (max-height: 375px) and (orientation: landscape) {
+  .dx-bg { background-position: 22% 28%; }
+}
+
+/* ============ TALL-SCREEN PHONES (21:9, common on Samsung/Vivo/Sony) ============ */
+@media (max-aspect-ratio: 9/20) {
+  .dx-bg { background-position: 0% 20%; }
+}
+/* ── warm color grade — lifts a cool/teal photo toward warm amber-red ── */
+.dx-colorgrade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(178,42,34,0.16), rgba(20,10,10,0.04) 55%);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── cinematic vignette ── */
+.dx-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 50%, transparent 30%, rgba(4,8,8,0.55) 100%),
+    linear-gradient(to bottom, rgba(4,8,8,0.32) 0%, transparent 24%, transparent 62%, rgba(4,8,8,0.78) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* ── fine film grain — keeps the warm photo from looking flat/digital ── */
+.dx-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── amber light bloom (doorway glow) ── */
+.dx-bloom {
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 8%;
+  height: 42%;
+  background: radial-gradient(ellipse at 50% 90%, rgba(247,190,70,0.22) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 3;
+  animation: dx-bloom-breathe 4s ease-in-out infinite;
+}
+
+@keyframes dx-bloom-breathe {
+  0%, 100% { opacity: 0.7; transform: scaleX(1); }
+  50%       { opacity: 1;   transform: scaleX(1.08); }
+}
+
+/* ── bokeh dust particles ── */
+.dx-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.dx-particle {
+  animation: dx-float linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes dx-float {
+  0%   { transform: translate(0, 0)  scale(1);    opacity: inherit; }
+  25%  { transform: translate(1.2%, -3%) scale(1.1); }
+  50%  { transform: translate(-0.8%, -6%) scale(0.9); opacity: 0; }
+  75%  { transform: translate(1.5%, -9%) scale(1.05); opacity: inherit; }
+  100% { transform: translate(0, -13%) scale(1);  opacity: 0; }
+}
+
+/* ── top bar: clock · online count · streaming links ── */
+.dx-topbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+  padding: calc(2.2% + var(--dx-safe-t)) calc(3% + var(--dx-safe-r)) 0 calc(3% + var(--dx-safe-l));
+  pointer-events: none;
+  animation: dx-rise-in 0.8s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.dx-topbar-clock {
+  font-size: clamp(12px, 1.6vw, 16px);
+  font-weight: 600;
+  color: rgba(255,255,255,0.92);
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  letter-spacing: 0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dx-topbar-online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(11px, 1.3vw, 13px);
+  color: rgba(255,255,255,0.85);
+  background: rgba(10,14,14,0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 5px 12px;
+  border-radius: var(--dx-radius-pill);
+  border: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+  order: 3;
+  flex: 1 0 100%;
+  justify-content: center;
+  max-width: fit-content;
+  margin: 0 auto;
+}
+
+.dx-online-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--dx-online);
+  box-shadow: 0 0 6px rgba(74,222,128,0.8);
+  animation: dx-dot-pulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes dx-dot-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.8); }
+}
+
+.dx-topbar-links {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+  flex-shrink: 0;
+}
+
+.dx-link-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: clamp(10px, 1.15vw, 12px);
+  font-weight: 500;
+  color: rgba(255,255,255,0.9);
+  background: rgba(10,14,14,0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  padding: 7px 13px;
+  border-radius: var(--dx-radius-pill);
+  border: 1px solid rgba(255,255,255,0.1);
+  text-decoration: none;
+  transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.dx-link-badge:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(247,198,90,0.3);
+  transform: translateY(-1px);
+}
+
+.dx-link-badge:focus-visible {
+  outline: 2px solid var(--dx-amber);
+  outline-offset: 2px;
+}
+
+/* on wide screens the online pill sits inline between clock and links again */
+@media (min-width: 561px) {
+  .dx-topbar-online { order: 0; flex: 0 0 auto; margin: 0; }
+}
+
+/* ── player ── */
+.dx-player-wrap {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(3% + var(--dx-safe-b));
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  padding: 0 calc(4% + var(--dx-safe-l));
+  animation: dx-rise-in 0.8s cubic-bezier(0.16,1,0.3,1) both;
+  animation-delay: 0.2s;
+}
+
+@keyframes dx-rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dx-player-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: clamp(320px, 34vw, 480px);
+  background: var(--dx-glass);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid var(--dx-glass-border);
+  border-radius: 28px;
+  padding: 10px 18px 10px 10px;
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.3),
+    0 12px 30px rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1),
+              box-shadow 0.35s ease,
+              border-color 0.35s ease;
+}
+
+@media (min-width: 561px) {
+  .dx-player-card { border-radius: var(--dx-radius-pill); padding: 0.9% 1.8% 0.9% 0.9%; }
+}
+
+.dx-player-card:hover {
+  transform: translateY(-3px) scale(1.008);
+  border-color: rgba(255,255,255,0.2);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.3),
+    0 18px 40px rgba(0,0,0,0.5),
+    0 0 0 1px rgba(247,198,90,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+/* playing state: subtle amber border pulse */
+.dx-player-card--playing {
+  border-color: rgba(247,198,90,0.22);
+  box-shadow:
+    0 2px 8px rgba(0,0,0,0.3),
+    0 12px 30px rgba(0,0,0,0.4),
+    0 0 24px rgba(247,198,90,0.08),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+/* shine sweep */
+.dx-player-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -70%;
+  width: 38%; height: 100%;
+  background: linear-gradient(100deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.11) 50%,
+    rgba(255,255,255,0) 100%);
+  transform: skewX(-18deg);
+  animation: dx-shine 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dx-shine {
+  0%        { left: -70%; }
+  30%, 100% { left: 130%; }
+}
+
+/* ── album art ── */
+.dx-album-art {
+  width: clamp(42px, 17%, 60px);
+  aspect-ratio: 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--dx-clay-1), var(--dx-clay-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #fbf3e4;
+  box-shadow: 0 0 0 0 rgba(247,198,90,0);
+  transition: box-shadow 0.5s ease;
+}
+
+.dx-album-art img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+.dx-album-art--playing {
+  animation: dx-art-spin 18s linear infinite, dx-art-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes dx-art-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes dx-art-glow {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(247,198,90,0.18), 0 0 12px rgba(247,198,90,0.08); }
+  50%       { box-shadow: 0 0 0 4px rgba(247,198,90,0.32), 0 0 20px rgba(247,198,90,0.18); }
+}
+
+/* ── track info ── */
+.dx-player-body { flex: 1; min-width: 0; }
+
+.dx-track-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Fraunces", "Poppins", serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: clamp(13px, 1.9vw, 17px);
+  color: #fff;
+  letter-spacing: 0.2px;
+  min-width: 0;
+}
+
+.dx-track-title-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* equalizer bars */
+.dx-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.dx-eq span {
+  display: block;
+  width: 2.5px;
+  border-radius: 1px;
+  background: var(--dx-amber);
+  transform-origin: bottom;
+  animation: dx-eq-bounce ease-in-out infinite;
+}
+
+.dx-eq span:nth-child(1) { height: 35%; animation-duration: 0.7s; animation-delay: -0.3s; }
+.dx-eq span:nth-child(2) { height: 100%; animation-duration: 0.9s; animation-delay: -0.6s; }
+.dx-eq span:nth-child(3) { height: 60%; animation-duration: 0.75s; animation-delay: -0.15s; }
+.dx-eq span:nth-child(4) { height: 80%; animation-duration: 1s; animation-delay: -0.5s; }
+
+@keyframes dx-eq-bounce {
+  0%, 100% { transform: scaleY(0.25); }
+  50%       { transform: scaleY(1); }
+}
+
+.dx-track-artist {
+  font-size: clamp(10px, 1.2vw, 12px);
+  color: rgba(255,255,255,0.6);
+  margin: 2px 0 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── progress bar ── */
+.dx-progress-track {
+  height: 3px;
+  width: 100%;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.2);
+  overflow: visible;
+  position: relative;
+  cursor: pointer;
+  /* generous invisible hit area for touch scrubbing */
+  padding: 10px 0;
+  margin: -10px 0;
+  background-clip: content-box;
+}
+
+.dx-progress-fill {
+  position: relative;
+  height: 100%;
+  background: linear-gradient(90deg, #c48a20, var(--dx-amber), #fff9e6);
+  border-radius: 4px;
+  transition: width 1s linear;
+  pointer-events: none;
+}
+
+.dx-progress-dot {
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 6px rgba(247,198,90,0.9);
+  transition: opacity 0.3s;
+}
+
+.dx-time-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(9px, 1.05vw, 11px);
+  color: rgba(255,255,255,0.55);
+  margin-top: 4px;
+  letter-spacing: 0.4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dx-time-sep { opacity: 0.4; }
+.dx-time-total { opacity: 0.5; }
+
+/* ── controls ── */
+.dx-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.dx-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  opacity: 0.8;
+  transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+  touch-action: manipulation;
+}
+
+.dx-btn:hover {
+  opacity: 1;
+  transform: scale(1.12);
+  background: rgba(255,255,255,0.08);
+}
+
+.dx-btn:active { transform: scale(0.92); }
+
+.dx-btn--play {
+  opacity: 1;
+  width: clamp(34px, 3.4vw, 42px);
+  height: clamp(34px, 3.4vw, 42px);
+  background: linear-gradient(135deg, rgba(247,198,90,0.28), rgba(255,255,255,0.1));
+  border-radius: 50%;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1),
+              background 0.2s ease, opacity 0.2s ease;
+}
+
+.dx-btn--play:hover {
+  background: linear-gradient(135deg, rgba(247,198,90,0.4), rgba(255,255,255,0.16));
+  transform: scale(1.14);
+}
+
+.dx-btn:focus-visible {
+  outline: 2px solid var(--dx-amber);
+  outline-offset: 2px;
+}
+
+/* ── reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .dx-bg,
+  .dx-bloom,
+  .dx-topbar,
+  .dx-player-wrap,
+  .dx-player-card::before,
+  .dx-album-art--playing,
+  .dx-eq span,
+  .dx-online-dot,
+  .dx-particle { animation: none !important; }
+}
+
+/* ── large / ultra-wide desktops: keep the card from floating too small ── */
+@media (min-width: 1600px) {
+  .dx-player-card { max-width: 520px; }
+}
+
+/* ── tablets (portrait + landscape) ── */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .dx-player-card { max-width: clamp(380px, 52vw, 440px); }
+}
+/* iPad Pro / larger tablet landscape falls into desktop width range —
+   catch it explicitly so the card doesn't get too small relative to a touch UI */
+@media (min-width: 1025px) and (max-width: 1366px) and (pointer: coarse) {
+  .dx-player-card { max-width: clamp(420px, 40vw, 520px); }
+  .dx-btn { width: 42px; height: 42px; }
+  .dx-btn--play { width: 46px; height: 46px; }
+}
+
+/* ── phones ── */
+@media (max-width: 640px) {
+  .dx-player-wrap { padding: 0 16px; bottom: calc(20px + var(--dx-safe-b)); }
+  .dx-player-card {
+    max-width: 100%;
+    padding: 10px 14px 10px 10px;
+    gap: 12px;
+  }
+  .dx-topbar { padding: calc(16px + var(--dx-safe-t)) 16px 0; }
+  .dx-topbar-links { gap: 6px; }
+  .dx-link-badge { padding: 7px 11px; }
+  .dx-link-badge span:not(.dx-eq) { display: none; }
+  .dx-btn { width: 40px; height: 40px; }
+  .dx-btn--play { width: 44px; height: 44px; }
+}
+
+@media (max-width: 380px) {
+  .dx-album-art { width: 40px; }
+  .dx-controls { gap: 0; }
+  .dx-btn { width: 36px; height: 36px; }
+  .dx-btn--play { width: 40px; height: 40px; }
+}
+
+/* very small / folded phones — keep controls usable, avoid squeeze */
+@media (max-width: 300px) {
+  .dx-player-card { padding: 8px 10px 8px 8px; gap: 8px; }
+  .dx-album-art { width: 34px; }
+  .dx-btn { width: 32px; height: 32px; }
+  .dx-btn--play { width: 36px; height: 36px; }
+  .dx-controls { gap: 0; }
+}
+
+/* ── short / landscape phones: reclaim vertical space ── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .dx-topbar { padding-top: calc(10px + var(--dx-safe-t)); }
+  .dx-topbar-online { order: 0; flex: 0 0 auto; margin: 0; }
+  .dx-player-wrap { bottom: calc(10px + var(--dx-safe-b)); }
+  .dx-player-card { padding: 6px 14px 6px 6px; }
+  .dx-track-artist { margin-bottom: 4px; }
+}
