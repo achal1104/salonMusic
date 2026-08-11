@@ -16,6 +16,7 @@ cd deluxe-saloon
 
 ## 3. Install dependencies
 ```
+
 npm install
 ```
 
