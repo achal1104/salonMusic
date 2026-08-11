@@ -172,48 +172,40 @@ export default function App() {
     const el = audioRef.current;
     if (!el || !trackObj?.id) return;
 
+    const url = `${API_BASE}/api/songs/${trackObj.id}/audio`;
+
     el._cleanupPlay?.();
     trackChangingRef.current = true;
     el.pause();
-    el.src = "";
+    el.src = url;
+    el.load();
     trackChangingRef.current = false;
     setProgress(0);
     setDuration(0);
 
-    // fetch fresh stream URL from backend, then play
-    fetch(`${API_BASE}/api/songs/${trackObj.id}/stream-url`)
-      .then((r) => r.json())
-      .then((freshUrl) => {
-        if (!freshUrl) return;
-        trackChangingRef.current = true;
-        el.pause();
-        el.src = freshUrl;
-        el.load();
-        trackChangingRef.current = false;
-        if (!shouldPlay) return;
-        let done = false;
-        const attempt = () => {
-          if (done) return;
-          done = true;
-          cleanup();
-          el.play().then(() => setIsPlaying(true)).catch((err) => {
-            if (err.name === "AbortError") {
-              setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
-            }
-          });
-        };
-        const cleanup = () => {
-          el.removeEventListener("canplay", attempt);
-          el.removeEventListener("canplaythrough", attempt);
-          clearTimeout(timer);
-          el._cleanupPlay = null;
-        };
-        el.addEventListener("canplay", attempt);
-        el.addEventListener("canplaythrough", attempt);
-        const timer = setTimeout(attempt, 4000);
-        el._cleanupPlay = cleanup;
-      })
-      .catch(() => { if (shouldPlay) handleNext(); });
+    if (!shouldPlay) return;
+
+    let done = false;
+    const attempt = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      el.play().then(() => setIsPlaying(true)).catch((err) => {
+        if (err.name === "AbortError") {
+          setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
+        }
+      });
+    };
+    const cleanup = () => {
+      el.removeEventListener("canplay", attempt);
+      el.removeEventListener("canplaythrough", attempt);
+      clearTimeout(timer);
+      el._cleanupPlay = null;
+    };
+    el.addEventListener("canplay", attempt);
+    el.addEventListener("canplaythrough", attempt);
+    const timer = setTimeout(attempt, 4000);
+    el._cleanupPlay = cleanup;
   }, []);
 
   // index or playlist changed → reload track, keep play/pause state
@@ -253,7 +245,6 @@ export default function App() {
         if (err.name === "AbortError") {
           setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
         } else {
-          // src may have expired — re-fetch
           playTrack(track, true);
         }
       });
