@@ -122,6 +122,14 @@ export default function App() {
 
   const track = playlist[index];
 
+  // keep Render backend awake — ping every 10 minutes
+  useEffect(() => {
+    const ping = () => fetch(`${API_BASE}/api/songs/1`).catch(() => {});
+    ping();
+    const id = setInterval(ping, 10 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
   // clock
   useEffect(() => {
     const id = setInterval(() => setClock(formatClock(new Date())), 30000);
