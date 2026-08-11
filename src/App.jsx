@@ -172,52 +172,48 @@ export default function App() {
     const el = audioRef.current;
     if (!el || !trackObj?.id) return;
 
-    const url = `${API_BASE}/api/songs/${trackObj.id}/stream`;
-
-    // cancel any pending play setup
     el._cleanupPlay?.();
-
-    // flag so onPause handler ignores this programmatic pause
     trackChangingRef.current = true;
     el.pause();
-    el.src = url;
-    el.load();
+    el.src = "";
     trackChangingRef.current = false;
-
     setProgress(0);
     setDuration(0);
 
-    if (!shouldPlay) return;
-
-    let done = false;
-    const attempt = () => {
-      if (done) return;
-      done = true;
-      cleanup();
-      el.play().then(() => {
-        setIsPlaying(true);
-      }).catch((err) => {
-        // NotAllowedError = autoplay blocked — user must tap, nothing we can do
-        // AbortError = another load() interrupted — retry once after short delay
-        if (err.name === "AbortError") {
-          setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
-        }
-        // NotAllowedError: leave isPlaying false so button shows Play
-      });
-    };
-
-    const cleanup = () => {
-      el.removeEventListener("canplay", attempt);
-      el.removeEventListener("canplaythrough", attempt);
-      clearTimeout(timer);
-      el._cleanupPlay = null;
-    };
-
-    // fire on whichever readiness event comes first; 4 s hard fallback
-    el.addEventListener("canplay", attempt);
-    el.addEventListener("canplaythrough", attempt);
-    const timer = setTimeout(attempt, 4000);
-    el._cleanupPlay = cleanup;
+    // fetch fresh stream URL from backend, then play
+    fetch(`${API_BASE}/api/songs/${trackObj.id}/stream-url`)
+      .then((r) => r.json())
+      .then((freshUrl) => {
+        if (!freshUrl) return;
+        trackChangingRef.current = true;
+        el.pause();
+        el.src = freshUrl;
+        el.load();
+        trackChangingRef.current = false;
+        if (!shouldPlay) return;
+        let done = false;
+        const attempt = () => {
+          if (done) return;
+          done = true;
+          cleanup();
+          el.play().then(() => setIsPlaying(true)).catch((err) => {
+            if (err.name === "AbortError") {
+              setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
+            }
+          });
+        };
+        const cleanup = () => {
+          el.removeEventListener("canplay", attempt);
+          el.removeEventListener("canplaythrough", attempt);
+          clearTimeout(timer);
+          el._cleanupPlay = null;
+        };
+        el.addEventListener("canplay", attempt);
+        el.addEventListener("canplaythrough", attempt);
+        const timer = setTimeout(attempt, 4000);
+        el._cleanupPlay = cleanup;
+      })
+      .catch(() => { if (shouldPlay) handleNext(); });
   }, []);
 
   // index or playlist changed → reload track, keep play/pause state
@@ -249,16 +245,16 @@ export default function App() {
       el.pause();
       setIsPlaying(false);
     } else {
-      // no src yet — load first track
       if (!el.src || el.src === window.location.href) {
         playTrack(track, true);
         return;
       }
-      // resume: reload + play (required on iOS after interruption)
-      el.load();
       el.play().then(() => setIsPlaying(true)).catch((err) => {
         if (err.name === "AbortError") {
           setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
+        } else {
+          // src may have expired — re-fetch
+          playTrack(track, true);
         }
       });
     }
