@@ -106,7 +106,7 @@ export default function App() {
         .then((res) => res.json())
         .then((s) => {
           const el = audioRef.current;
-          if (!el || !userInteracted) return;
+          if (!el) return;
 
           const newId = Number(s.songId);
           const newTheme = s.theme;
@@ -141,7 +141,7 @@ export default function App() {
     };
     syncIntervalRef.current = setInterval(syncWithBackend, 1000);
     return () => clearInterval(syncIntervalRef.current);
-  }, [theme, index, userInteracted]);
+  }, [theme, index]);
 
   // push state to backend when user interacts
   const pushSync = (patch) => {
