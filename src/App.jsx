@@ -92,6 +92,7 @@ export default function App() {
   const targetMouse = useRef({ x: 0.5, y: 0.5 });
   const currentMouse = useRef({ x: 0.5, y: 0.5 });
   const isPlayingRef = useRef(false);
+  const trackChangingRef = useRef(false); // suppress onPause during src swap
 
   // keep ref in sync so callbacks always see latest value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
@@ -166,58 +167,73 @@ export default function App() {
     };
   }, []);
 
-  // ── Single audio controller — handles all play/pause/next/prev ──
+  // ── Single audio controller ──────────────────────────────────────────
   const playTrack = useCallback((trackObj, shouldPlay) => {
     const el = audioRef.current;
     if (!el || !trackObj?.id) return;
+
     const url = trackObj.audioUrl
       ? (trackObj.audioUrl.startsWith("http") ? trackObj.audioUrl : `${API_BASE}/api/songs/${trackObj.id}/audio`)
       : `${API_BASE}/api/songs/${trackObj.id}/audio`;
-    el.pause();
-    // remove any lingering listeners from a previous call
+
+    // cancel any pending play setup
     el._cleanupPlay?.();
+
+    // flag so onPause handler ignores this programmatic pause
+    trackChangingRef.current = true;
+    el.pause();
     el.src = url;
+    el.load();
+    trackChangingRef.current = false;
+
     setProgress(0);
     setDuration(0);
-    if (shouldPlay) {
-      el.load();
-      let done = false;
-      const tryPlay = () => {
-        if (done) return;
-        done = true;
-        cleanup();
-        el.play().catch(() => {});
-      };
-      const cleanup = () => {
-        el.removeEventListener("canplay", tryPlay);
-        el.removeEventListener("canplaythrough", tryPlay);
-        clearTimeout(timer);
-        el._cleanupPlay = null;
-      };
-      // fallback: if neither canplay nor canplaythrough fires in 3 s, try anyway
-      const timer = setTimeout(tryPlay, 3000);
-      el.addEventListener("canplay", tryPlay);
-      el.addEventListener("canplaythrough", tryPlay);
-      el._cleanupPlay = cleanup;
-    }
+
+    if (!shouldPlay) return;
+
+    let done = false;
+    const attempt = () => {
+      if (done) return;
+      done = true;
+      cleanup();
+      el.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        // NotAllowedError = autoplay blocked — user must tap, nothing we can do
+        // AbortError = another load() interrupted — retry once after short delay
+        if (err.name === "AbortError") {
+          setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
+        }
+        // NotAllowedError: leave isPlaying false so button shows Play
+      });
+    };
+
+    const cleanup = () => {
+      el.removeEventListener("canplay", attempt);
+      el.removeEventListener("canplaythrough", attempt);
+      clearTimeout(timer);
+      el._cleanupPlay = null;
+    };
+
+    // fire on whichever readiness event comes first; 4 s hard fallback
+    el.addEventListener("canplay", attempt);
+    el.addEventListener("canplaythrough", attempt);
+    const timer = setTimeout(attempt, 4000);
+    el._cleanupPlay = cleanup;
   }, []);
 
-  // when index or playlist changes — load and play/pause based on isPlayingRef
+  // index or playlist changed → reload track, keep play/pause state
   useEffect(() => {
-    playTrack(track, isPlayingRef.current);
-  }, [index, playlist]);
+    playTrack(playlist[index], isPlayingRef.current);
+  }, [index, playlist]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleNext = () => {
-    const next = (index + 1) % playlist.length;
-    setIndex(next);
-    playTrack(playlist[next], isPlayingRef.current);
-  };
+  const handleNext = useCallback(() => {
+    setIndex((i) => (i + 1) % playlist.length);
+  }, [playlist.length]);
 
-  const handlePrev = () => {
-    const next = (index - 1 + playlist.length) % playlist.length;
-    setIndex(next);
-    playTrack(playlist[next], isPlayingRef.current);
-  };
+  const handlePrev = useCallback(() => {
+    setIndex((i) => (i - 1 + playlist.length) % playlist.length);
+  }, [playlist.length]);
 
   const togglePlay = () => {
     const el = audioRef.current;
@@ -226,14 +242,18 @@ export default function App() {
       el.pause();
       setIsPlaying(false);
     } else {
-      // if src not set yet, load first track
+      // no src yet — load first track
       if (!el.src || el.src === window.location.href) {
         playTrack(track, true);
-        setIsPlaying(true);
         return;
       }
-      el.play().catch(() => {});
-      setIsPlaying(true);
+      // resume: reload + play (required on iOS after interruption)
+      el.load();
+      el.play().then(() => setIsPlaying(true)).catch((err) => {
+        if (err.name === "AbortError") {
+          setTimeout(() => el.play().then(() => setIsPlaying(true)).catch(() => {}), 300);
+        }
+      });
     }
   };
 
@@ -376,8 +396,8 @@ export default function App() {
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onEnded={handleNext}
         onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onError={() => { setTimeout(handleNext, 800); }}
+        onPause={() => { if (!trackChangingRef.current) setIsPlaying(false); }}
+        onError={() => { setTimeout(handleNext, 500); }}
       />
 
       <div className="dx-player-wrap">
