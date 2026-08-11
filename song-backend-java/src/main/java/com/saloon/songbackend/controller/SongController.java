@@ -16,6 +16,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.io.InputStream;
+import java.net.URL;
 
 @RestController
 @RequestMapping("/api/songs")
@@ -53,6 +55,45 @@ public class SongController {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    // GET fresh stream URL from JioSaavn for a song by title
+    private String fetchFreshUrl(String title) {
+        try {
+            String query = java.net.URLEncoder.encode(title, "UTF-8");
+            String response = restTemplate.getForObject(
+                "https://jiosaavn-api-2.vercel.app/search/songs?query=" + query + "&limit=1", String.class);
+            JsonNode results = objectMapper.readTree(response).path("results");
+            if (results.isArray() && results.size() > 0) {
+                JsonNode urls = results.get(0).path("downloadUrl");
+                for (JsonNode u : urls) {
+                    if ("96kbps".equals(u.path("quality").asText())) return u.path("link").asText();
+                }
+                if (urls.size() > 0) return urls.get(urls.size() - 1).path("link").asText();
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
+    // GET /api/songs/{id}/stream — always fetches a fresh URL and proxies audio
+    @GetMapping("/{id}/stream")
+    public ResponseEntity<byte[]> streamAudio(@PathVariable Long id) {
+        return repository.findById(id).map(song -> {
+            try {
+                String freshUrl = fetchFreshUrl(song.getTitle());
+                if (freshUrl == null) return ResponseEntity.notFound().<byte[]>build();
+                try (InputStream in = new URL(freshUrl).openStream()) {
+                    byte[] bytes = in.readAllBytes();
+                    return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                        .contentType(MediaType.parseMediaType("audio/mp4"))
+                        .body(bytes);
+                }
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<byte[]>build();
+            }
+        }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // GET all songs filtered by theme
