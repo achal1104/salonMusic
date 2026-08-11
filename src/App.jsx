@@ -62,7 +62,6 @@ export default function App() {
   const [clock, setClock] = useState(() => formatClock(new Date()));
   const [onlineCount, setOnlineCount] = useState(41);
   const [playlist, setPlaylist] = useState(STATIC_PLAYLIST);
-  const [userInteracted, setUserInteracted] = useState(false);
 
   // ── Modern background crop tuner ──────────────────────────────────────
   // Only active when the URL has ?tune=1, so it never appears for real
@@ -423,42 +422,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Tap to Join overlay — shown on devices that haven't interacted yet */}
-      {!userInteracted && (
-        <div
-          onClick={() => {
-            setUserInteracted(true);
-            // immediately fetch sync state and start playing
-            fetch(`${API_BASE}/api/sync`)
-              .then((res) => res.json())
-              .then((s) => {
-                if (s.isPlaying) {
-                  setIsPlaying(true);
-                  setTimeout(() => {
-                    audioRef.current?.play().catch(() => {});
-                  }, 300);
-                }
-              })
-              .catch(() => {});
-          }}
-          style={{
-            position: "fixed", inset: 0, zIndex: 999,
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            background: "rgba(0,0,0,0.75)", cursor: "pointer",
-            color: "#f7c65a", fontFamily: "sans-serif", gap: 16,
-          }}
-        >
-          <div style={{ fontSize: 56 }}>🎵</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>Tap to Join</div>
-          <div style={{ fontSize: 14, opacity: 0.7 }}>Sync music with all devices</div>
-          <div style={{
-            marginTop: 8, padding: "10px 28px",
-            background: "#f7c65a", color: "#000",
-            borderRadius: 999, fontWeight: 600, fontSize: 15
-          }}>Join Now</div>
-        </div>
-      )}
+      {/* HTML5 Audio element — src set imperatively */}
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
