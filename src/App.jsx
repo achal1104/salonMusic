@@ -10,7 +10,8 @@ const API_BASE = "https://rajkumar-salon-backend.onrender.com";
 // automatically when the toggle is switched.
 const BACKGROUND_IMAGES = {
   vintage: "/images/rajkumarsalons.jpg",
-  modern: "/images/modernsalon.png",
+  // modern: "/images/modernsalon.png",
+  modern: "/images/rajkumarsalonfinal.jpeg",
 };
 
 // Salon name shown as a MOBILE-ONLY overlay on top of the hero photo.
