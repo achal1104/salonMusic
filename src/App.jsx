@@ -227,13 +227,22 @@ export default function App() {
     playTrack(playlist[index], isPlayingRef.current);
   }, [index, playlist]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const playlistRef = useRef(playlist);
+  useEffect(() => { playlistRef.current = playlist; }, [playlist]);
+
   const handleNext = useCallback(() => {
-    setIndex((i) => (i + 1) % playlist.length);
-  }, [playlist.length]);
+    setIndex((i) => (i + 1) % playlistRef.current.length);
+  }, []);
 
   const handlePrev = useCallback(() => {
-    setIndex((i) => (i - 1 + playlist.length) % playlist.length);
-  }, [playlist.length]);
+    const el = audioRef.current;
+    // if more than 3s in — restart current track
+    if (el && el.currentTime > 3) {
+      el.currentTime = 0;
+      return;
+    }
+    setIndex((i) => (i - 1 + playlistRef.current.length) % playlistRef.current.length);
+  }, []);
 
   const togglePlay = () => {
     const el = audioRef.current;
