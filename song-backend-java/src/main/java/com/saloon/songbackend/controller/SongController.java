@@ -75,24 +75,15 @@ public class SongController {
         return null;
     }
 
-    // GET /api/songs/{id}/stream — always fetches a fresh URL and proxies audio
-    @GetMapping("/{id}/stream")
-    public ResponseEntity<byte[]> streamAudio(@PathVariable Long id) {
+    // GET /api/songs/{id}/stream-url — returns fresh JioSaavn URL as JSON
+    @GetMapping("/{id}/stream-url")
+    public ResponseEntity<String> getStreamUrl(@PathVariable Long id) {
         return repository.findById(id).map(song -> {
-            try {
-                String freshUrl = fetchFreshUrl(song.getTitle());
-                if (freshUrl == null) return ResponseEntity.notFound().<byte[]>build();
-                try (InputStream in = new URL(freshUrl).openStream()) {
-                    byte[] bytes = in.readAllBytes();
-                    return ResponseEntity.ok()
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
-                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                        .contentType(MediaType.parseMediaType("audio/mp4"))
-                        .body(bytes);
-                }
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<byte[]>build();
-            }
+            String freshUrl = fetchFreshUrl(song.getTitle());
+            if (freshUrl == null) return ResponseEntity.notFound().<String>build();
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .body("\"" + freshUrl + "\"");
         }).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
