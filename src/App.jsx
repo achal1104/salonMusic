@@ -172,9 +172,7 @@ export default function App() {
     const el = audioRef.current;
     if (!el || !trackObj?.id) return;
 
-    const url = trackObj.audioUrl
-      ? (trackObj.audioUrl.startsWith("http") ? trackObj.audioUrl : `${API_BASE}/api/songs/${trackObj.id}/audio`)
-      : `${API_BASE}/api/songs/${trackObj.id}/audio`;
+    const url = `${API_BASE}/api/songs/${trackObj.id}/stream`;
 
     // cancel any pending play setup
     el._cleanupPlay?.();
