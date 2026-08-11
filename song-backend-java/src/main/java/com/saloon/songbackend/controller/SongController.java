@@ -9,6 +9,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -22,9 +25,48 @@ public class SongController {
         this.repository = repository;
     }
 
+    private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // Fetch JioSaavn stream URL for a song title+artist, cache it in DB
+    private void resolveAudioUrl(Song song) {
+        try {
+            String query = (song.getTitle() + " " + song.getArtist())
+                    .replaceAll("\\s+", "+");
+            String apiUrl = "https://saavn.dev/api/search/songs?query=" + query + "&limit=1";
+            String response = restTemplate.getForObject(apiUrl, String.class);
+            JsonNode root = objectMapper.readTree(response);
+            JsonNode results = root.path("data").path("results");
+            if (results.isArray() && results.size() > 0) {
+                JsonNode downloadUrls = results.get(0).path("downloadUrl");
+                // pick 128kbps quality
+                String url = null;
+                for (JsonNode u : downloadUrls) {
+                    if ("medium".equals(u.path("quality").asText())) {
+                        url = u.path("url").asText();
+                        break;
+                    }
+                }
+                if (url == null && downloadUrls.size() > 0) {
+                    url = downloadUrls.get(0).path("url").asText();
+                }
+                if (url != null && !url.isBlank()) {
+                    song.setAudioUrl(url);
+                    repository.save(song);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     // GET all songs filtered by theme
     @GetMapping
     public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "vintage") String theme) {
+        List<Song> songs = repository.findByThemeOrderByPositionAsc(theme);
+        // resolve missing audio URLs in background
+        songs.stream()
+             .filter(s -> s.getAudioUrl() == null || s.getAudioUrl().isBlank())
+             .limit(10) // resolve max 10 per request to avoid timeout
+             .forEach(this::resolveAudioUrl);
         return repository.findByThemeOrderByPositionAsc(theme);
     }
 
