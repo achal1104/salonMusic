@@ -34,19 +34,19 @@ public class SongController {
     // Fetch JioSaavn stream URL for a song, cache in DB
     private void resolveAudioUrl(Song song) {
         try {
-            String query = java.net.URLEncoder.encode(song.getTitle() + " " + song.getArtist(), "UTF-8");
-            String apiUrl = "https://saavn.dev/api/search/songs?query=" + query + "&limit=1";
+            String query = java.net.URLEncoder.encode(song.getTitle(), "UTF-8");
+            String apiUrl = "https://jiosaavn-api-2.vercel.app/search/songs?query=" + query + "&limit=1";
             String response = restTemplate.getForObject(apiUrl, String.class);
-            JsonNode results = objectMapper.readTree(response).path("data").path("results");
+            JsonNode results = objectMapper.readTree(response).path("results");
             if (results.isArray() && results.size() > 0) {
                 JsonNode downloadUrls = results.get(0).path("downloadUrl");
                 String url = null;
-                // prefer 96kbps (medium) for broad device support
+                // prefer 96kbps for broad device support
                 for (JsonNode u : downloadUrls) {
                     String q = u.path("quality").asText();
-                    if ("medium".equals(q) || "low".equals(q)) { url = u.path("url").asText(); break; }
+                    if ("96kbps".equals(q)) { url = u.path("link").asText(); break; }
                 }
-                if (url == null && downloadUrls.size() > 0) url = downloadUrls.get(0).path("url").asText();
+                if (url == null && downloadUrls.size() > 0) url = downloadUrls.get(0).path("link").asText();
                 if (url != null && !url.isBlank() && url.startsWith("http")) {
                     song.setAudioUrl(url);
                     repository.save(song);
