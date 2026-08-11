@@ -92,68 +92,9 @@ export default function App() {
   const targetMouse = useRef({ x: 0.5, y: 0.5 });
   const currentMouse = useRef({ x: 0.5, y: 0.5 });
   const isPlayingRef = useRef(false);
-  const syncIntervalRef = useRef(null);
-  const isSyncingRef = useRef(false);
 
   // keep ref in sync so callbacks always see latest value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-
-  // ── Sync with backend every 1 second ──
-  useEffect(() => {
-    const syncWithBackend = () => {
-      if (isSyncingRef.current) return;
-      fetch(`${API_BASE}/api/sync`)
-        .then((res) => res.json())
-        .then((s) => {
-          const el = audioRef.current;
-          if (!el) return;
-
-          const newId = Number(s.songId);
-          const newTheme = s.theme;
-          const shouldPlay = Boolean(s.isPlaying);
-          const serverTime = Number(s.currentTime);
-
-          // sync theme
-          if (newTheme && newTheme !== theme) setTheme(newTheme);
-
-          // sync song index
-          setPlaylist((prev) => {
-            const idx = prev.findIndex((t) => Number(t.id) === newId);
-            if (idx !== -1 && idx !== index) setIndex(idx);
-            return prev;
-          });
-
-          // sync play/pause
-          if (shouldPlay && !isPlayingRef.current) {
-            setIsPlaying(true);
-            if (el.readyState >= 2) el.play().catch(() => {});
-          } else if (!shouldPlay && isPlayingRef.current) {
-            setIsPlaying(false);
-            el.pause();
-          }
-
-          // sync position — correct if drift > 1.5 seconds
-          if (shouldPlay && Math.abs(el.currentTime - serverTime) > 1.5) {
-            el.currentTime = serverTime;
-          }
-        })
-        .catch(() => {});
-    };
-    syncIntervalRef.current = setInterval(syncWithBackend, 1000);
-    return () => clearInterval(syncIntervalRef.current);
-  }, [theme, index]);
-
-  // push state to backend when user interacts
-  const pushSync = (patch) => {
-    isSyncingRef.current = true;
-    fetch(`${API_BASE}/api/sync`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    })
-      .catch(() => {})
-      .finally(() => { isSyncingRef.current = false; });
-  };
 
   // fetch playlist from backend whenever the theme changes — only songs with audio_url,
   // falling back to the static per-theme playlist if the backend has nothing for it.
@@ -225,73 +166,50 @@ export default function App() {
     };
   }, []);
 
-  // load track when index/playlist changes
-  useEffect(() => {
+  // ── Single audio controller — handles all play/pause/next/prev ──
+  const playTrack = useCallback((trackObj, shouldPlay) => {
     const el = audioRef.current;
-    if (!el || !track?.id) return;
-    const audioUrl = track.audioUrl
-      ? (track.audioUrl.startsWith("http") ? track.audioUrl : `${API_BASE}/api/songs/${track.id}/audio`)
-      : `${API_BASE}/api/songs/${track.id}/audio`;
-    el.src = audioUrl;
-    el.load();
+    if (!el || !trackObj?.id) return;
+    const url = trackObj.audioUrl
+      ? (trackObj.audioUrl.startsWith("http") ? trackObj.audioUrl : `${API_BASE}/api/songs/${trackObj.id}/audio`)
+      : `${API_BASE}/api/songs/${trackObj.id}/audio`;
+    el.pause();
+    el.src = url;
     setProgress(0);
     setDuration(0);
-    // play immediately as soon as enough data is loaded
-    if (isPlayingRef.current) {
-      const tryPlay = () => {
-        el.play().catch(() => {});
-        el.removeEventListener("loadeddata", tryPlay);
-      };
-      el.addEventListener("loadeddata", tryPlay);
-    }
-  }, [index, playlist]);
+    if (shouldPlay) el.play().catch(() => {});
+  }, []);
 
-  // play/pause toggle — immediate
+  // when index or playlist changes — load and play/pause based on isPlayingRef
   useEffect(() => {
-    const el = audioRef.current;
-    if (!el) return;
-    if (isPlaying) {
-      // if src not loaded yet, load then play
-      if (el.readyState >= 2) {
-        el.play().catch(() => {});
-      } else {
-        const tryPlay = () => {
-          el.play().catch(() => {});
-          el.removeEventListener("loadeddata", tryPlay);
-        };
-        el.addEventListener("loadeddata", tryPlay);
-      }
-    } else {
-      el.pause();
-    }
-  }, [isPlaying]);
-
-  const goTo = useCallback((newIndex, autoplay) => {
-    const next = (newIndex + playlist.length) % playlist.length;
-    setIndex(next);
-    setIsPlaying(autoplay);
-  }, [playlist]);
+    playTrack(track, isPlayingRef.current);
+  }, [index, playlist]);
 
   const handleNext = () => {
     const next = (index + 1) % playlist.length;
-    goTo(next, isPlayingRef.current);
-    pushSync({ songId: playlist[next]?.id, isPlaying: isPlayingRef.current, offsetSeconds: 0 });
+    setIndex(next);
+    playTrack(playlist[next], isPlayingRef.current);
   };
+
   const handlePrev = () => {
     const next = (index - 1 + playlist.length) % playlist.length;
-    goTo(next, isPlayingRef.current);
-    pushSync({ songId: playlist[next]?.id, isPlaying: isPlayingRef.current, offsetSeconds: 0 });
+    setIndex(next);
+    playTrack(playlist[next], isPlayingRef.current);
   };
+
   const togglePlay = () => {
-    const newPlaying = !isPlayingRef.current;
-    setIsPlaying(newPlaying);
-    pushSync({ isPlaying: newPlaying, offsetSeconds: audioRef.current?.currentTime || 0 });
+    const el = audioRef.current;
+    if (!el) return;
+    if (isPlayingRef.current) {
+      el.pause();
+      setIsPlaying(false);
+    } else {
+      el.play().catch(() => {});
+      setIsPlaying(true);
+    }
   };
-  const toggleTheme = () => {
-    const newTheme = theme === "vintage" ? "modern" : "vintage";
-    setTheme(newTheme);
-    pushSync({ theme: newTheme, songId: playlist[0]?.id, isPlaying: false, offsetSeconds: 0 });
-  };
+
+  const toggleTheme = () => setTheme((t) => t === "vintage" ? "modern" : "vintage");
 
   const handleSeek = (e) => {
     const el = progressTrackRef.current;
