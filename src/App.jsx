@@ -62,6 +62,7 @@ export default function App() {
   const [clock, setClock] = useState(() => formatClock(new Date()));
   const [onlineCount, setOnlineCount] = useState(41);
   const [playlist, setPlaylist] = useState(STATIC_PLAYLIST);
+  const [userInteracted, setUserInteracted] = useState(false);
 
   // ── Modern background crop tuner ──────────────────────────────────────
   // Only active when the URL has ?tune=1, so it never appears for real
@@ -98,7 +99,7 @@ export default function App() {
   // keep ref in sync so callbacks always see latest value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  // ── Sync with backend every 2 seconds ──
+  // ── Sync with backend every 1 second ──
   useEffect(() => {
     const syncWithBackend = () => {
       if (isSyncingRef.current) return;
@@ -106,30 +107,42 @@ export default function App() {
         .then((res) => res.json())
         .then((s) => {
           const el = audioRef.current;
-          if (!el) return;
-          // sync song
+          if (!el || !userInteracted) return;
+
           const newId = Number(s.songId);
           const newTheme = s.theme;
+          const shouldPlay = Boolean(s.isPlaying);
+          const serverTime = Number(s.currentTime);
+
+          // sync theme
           if (newTheme && newTheme !== theme) setTheme(newTheme);
+
+          // sync song index
           setPlaylist((prev) => {
-            const idx = prev.findIndex((t) => t.id === newId);
+            const idx = prev.findIndex((t) => Number(t.id) === newId);
             if (idx !== -1 && idx !== index) setIndex(idx);
             return prev;
           });
+
           // sync play/pause
-          const shouldPlay = s.isPlaying;
-          if (shouldPlay !== isPlayingRef.current) setIsPlaying(shouldPlay);
-          // sync position (only if drift > 2 seconds)
-          const serverTime = Number(s.currentTime);
-          if (Math.abs(el.currentTime - serverTime) > 2) {
+          if (shouldPlay && !isPlayingRef.current) {
+            setIsPlaying(true);
+            if (el.readyState >= 2) el.play().catch(() => {});
+          } else if (!shouldPlay && isPlayingRef.current) {
+            setIsPlaying(false);
+            el.pause();
+          }
+
+          // sync position — correct if drift > 1.5 seconds
+          if (shouldPlay && Math.abs(el.currentTime - serverTime) > 1.5) {
             el.currentTime = serverTime;
           }
         })
         .catch(() => {});
     };
-    syncIntervalRef.current = setInterval(syncWithBackend, 2000);
+    syncIntervalRef.current = setInterval(syncWithBackend, 1000);
     return () => clearInterval(syncIntervalRef.current);
-  }, [theme, index]);
+  }, [theme, index, userInteracted]);
 
   // push state to backend when user interacts
   const pushSync = (patch) => {
@@ -224,20 +237,31 @@ export default function App() {
     el.load();
     setProgress(0);
     setDuration(0);
+    // play immediately as soon as enough data is loaded
     if (isPlayingRef.current) {
-      el.oncanplay = () => {
-        el.play().catch((err) => console.error("Play error:", err));
-        el.oncanplay = null;
+      const tryPlay = () => {
+        el.play().catch(() => {});
+        el.removeEventListener("loadeddata", tryPlay);
       };
+      el.addEventListener("loadeddata", tryPlay);
     }
   }, [index, playlist]);
 
-  // play/pause toggle effect
+  // play/pause toggle — immediate
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
     if (isPlaying) {
-      el.play().catch((err) => console.error("Play error:", err));
+      // if src not loaded yet, load then play
+      if (el.readyState >= 2) {
+        el.play().catch(() => {});
+      } else {
+        const tryPlay = () => {
+          el.play().catch(() => {});
+          el.removeEventListener("loadeddata", tryPlay);
+        };
+        el.addEventListener("loadeddata", tryPlay);
+      }
     } else {
       el.pause();
     }
@@ -399,7 +423,42 @@ export default function App() {
         </div>
       </div>
 
-      {/* HTML5 Audio element — src set imperatively */}
+      {/* Tap to Join overlay — shown on devices that haven't interacted yet */}
+      {!userInteracted && (
+        <div
+          onClick={() => {
+            setUserInteracted(true);
+            // immediately fetch sync state and start playing
+            fetch(`${API_BASE}/api/sync`)
+              .then((res) => res.json())
+              .then((s) => {
+                if (s.isPlaying) {
+                  setIsPlaying(true);
+                  setTimeout(() => {
+                    audioRef.current?.play().catch(() => {});
+                  }, 300);
+                }
+              })
+              .catch(() => {});
+          }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 999,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)", cursor: "pointer",
+            color: "#f7c65a", fontFamily: "sans-serif", gap: 16,
+          }}
+        >
+          <div style={{ fontSize: 56 }}>🎵</div>
+          <div style={{ fontSize: 24, fontWeight: 700 }}>Tap to Join</div>
+          <div style={{ fontSize: 14, opacity: 0.7 }}>Sync music with all devices</div>
+          <div style={{
+            marginTop: 8, padding: "10px 28px",
+            background: "#f7c65a", color: "#000",
+            borderRadius: 999, fontWeight: 600, fontSize: 15
+          }}>Join Now</div>
+        </div>
+      )}
       <audio
         ref={audioRef}
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
