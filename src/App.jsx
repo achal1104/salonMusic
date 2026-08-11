@@ -174,10 +174,32 @@ export default function App() {
       ? (trackObj.audioUrl.startsWith("http") ? trackObj.audioUrl : `${API_BASE}/api/songs/${trackObj.id}/audio`)
       : `${API_BASE}/api/songs/${trackObj.id}/audio`;
     el.pause();
+    // remove any lingering listeners from a previous call
+    el._cleanupPlay?.();
     el.src = url;
     setProgress(0);
     setDuration(0);
-    if (shouldPlay) el.play().catch(() => {});
+    if (shouldPlay) {
+      el.load();
+      let done = false;
+      const tryPlay = () => {
+        if (done) return;
+        done = true;
+        cleanup();
+        el.play().catch(() => {});
+      };
+      const cleanup = () => {
+        el.removeEventListener("canplay", tryPlay);
+        el.removeEventListener("canplaythrough", tryPlay);
+        clearTimeout(timer);
+        el._cleanupPlay = null;
+      };
+      // fallback: if neither canplay nor canplaythrough fires in 3 s, try anyway
+      const timer = setTimeout(tryPlay, 3000);
+      el.addEventListener("canplay", tryPlay);
+      el.addEventListener("canplaythrough", tryPlay);
+      el._cleanupPlay = cleanup;
+    }
   }, []);
 
   // when index or playlist changes — load and play/pause based on isPlayingRef
@@ -204,6 +226,12 @@ export default function App() {
       el.pause();
       setIsPlaying(false);
     } else {
+      // if src not set yet, load first track
+      if (!el.src || el.src === window.location.href) {
+        playTrack(track, true);
+        setIsPlaying(true);
+        return;
+      }
       el.play().catch(() => {});
       setIsPlaying(true);
     }
@@ -343,10 +371,13 @@ export default function App() {
       {/* HTML5 Audio element — src set imperatively */}
       <audio
         ref={audioRef}
+        preload="auto"
         onTimeUpdate={(e) => setProgress(e.currentTarget.currentTime)}
         onDurationChange={(e) => setDuration(e.currentTarget.duration)}
         onEnded={handleNext}
-        onError={(e) => console.error("Audio error:", e.currentTarget.error)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onError={() => { setTimeout(handleNext, 800); }}
       />
 
       <div className="dx-player-wrap">
