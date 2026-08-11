@@ -91,9 +91,56 @@ export default function App() {
   const targetMouse = useRef({ x: 0.5, y: 0.5 });
   const currentMouse = useRef({ x: 0.5, y: 0.5 });
   const isPlayingRef = useRef(false);
+  const syncIntervalRef = useRef(null);
+  const isSyncingRef = useRef(false);
 
   // keep ref in sync so callbacks always see latest value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+
+  // ── Sync with backend every 2 seconds ──
+  useEffect(() => {
+    const syncWithBackend = () => {
+      if (isSyncingRef.current) return;
+      fetch(`${API_BASE}/api/sync`)
+        .then((res) => res.json())
+        .then((s) => {
+          const el = audioRef.current;
+          if (!el) return;
+          // sync song
+          const newId = Number(s.songId);
+          const newTheme = s.theme;
+          if (newTheme && newTheme !== theme) setTheme(newTheme);
+          setPlaylist((prev) => {
+            const idx = prev.findIndex((t) => t.id === newId);
+            if (idx !== -1 && idx !== index) setIndex(idx);
+            return prev;
+          });
+          // sync play/pause
+          const shouldPlay = s.isPlaying;
+          if (shouldPlay !== isPlayingRef.current) setIsPlaying(shouldPlay);
+          // sync position (only if drift > 2 seconds)
+          const serverTime = Number(s.currentTime);
+          if (Math.abs(el.currentTime - serverTime) > 2) {
+            el.currentTime = serverTime;
+          }
+        })
+        .catch(() => {});
+    };
+    syncIntervalRef.current = setInterval(syncWithBackend, 2000);
+    return () => clearInterval(syncIntervalRef.current);
+  }, [theme, index]);
+
+  // push state to backend when user interacts
+  const pushSync = (patch) => {
+    isSyncingRef.current = true;
+    fetch(`${API_BASE}/api/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    })
+      .catch(() => {})
+      .finally(() => { isSyncingRef.current = false; });
+  };
 
   // fetch playlist from backend whenever the theme changes — only songs with audio_url,
   // falling back to the static per-theme playlist if the backend has nothing for it.
@@ -177,7 +224,10 @@ export default function App() {
     setProgress(0);
     setDuration(0);
     if (isPlayingRef.current) {
-      el.play().catch((err) => console.error("Play error:", err));
+      el.oncanplay = () => {
+        el.play().catch((err) => console.error("Play error:", err));
+        el.oncanplay = null;
+      };
     }
   }, [index, playlist]);
 
@@ -198,10 +248,26 @@ export default function App() {
     setIsPlaying(autoplay);
   }, [playlist]);
 
-  const handleNext = () => goTo(index + 1, isPlayingRef.current);
-  const handlePrev = () => goTo(index - 1, isPlayingRef.current);
-  const togglePlay = () => setIsPlaying((p) => !p);
-  const toggleTheme = () => setTheme((t) => (t === "vintage" ? "modern" : "vintage"));
+  const handleNext = () => {
+    const next = (index + 1) % playlist.length;
+    goTo(next, isPlayingRef.current);
+    pushSync({ songId: playlist[next]?.id, isPlaying: isPlayingRef.current, offsetSeconds: 0 });
+  };
+  const handlePrev = () => {
+    const next = (index - 1 + playlist.length) % playlist.length;
+    goTo(next, isPlayingRef.current);
+    pushSync({ songId: playlist[next]?.id, isPlaying: isPlayingRef.current, offsetSeconds: 0 });
+  };
+  const togglePlay = () => {
+    const newPlaying = !isPlayingRef.current;
+    setIsPlaying(newPlaying);
+    pushSync({ isPlaying: newPlaying, offsetSeconds: audioRef.current?.currentTime || 0 });
+  };
+  const toggleTheme = () => {
+    const newTheme = theme === "vintage" ? "modern" : "vintage";
+    setTheme(newTheme);
+    pushSync({ theme: newTheme, songId: playlist[0]?.id, isPlaying: false, offsetSeconds: 0 });
+  };
 
   const handleSeek = (e) => {
     const el = progressTrackRef.current;
