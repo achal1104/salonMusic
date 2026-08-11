@@ -29,7 +29,7 @@ public class SongController {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
     // Fetch JioSaavn stream URL for a song, cache in DB
     private void resolveAudioUrl(Song song) {
@@ -55,18 +55,21 @@ public class SongController {
         } catch (Exception ignored) {}
     }
 
-    // GET all songs filtered by theme — resolves missing URLs in background
+    // GET all songs filtered by theme
     @GetMapping
     public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "vintage") String theme) {
-        List<Song> songs = repository.findByThemeOrderByPositionAsc(theme);
-        List<Song> unresolved = songs.stream()
+        return repository.findByThemeOrderByPositionAsc(theme);
+    }
+
+    // POST resolve all missing audio URLs — call once to seed everything
+    @PostMapping("/resolve-all")
+    public ResponseEntity<String> resolveAll() {
+        List<Song> unresolved = repository.findAll().stream()
             .filter(s -> s.getAudioUrl() == null || s.getAudioUrl().isBlank() || !s.getAudioUrl().startsWith("http"))
-            .limit(5)
             .toList();
-        if (!unresolved.isEmpty()) {
-            executor.submit(() -> unresolved.forEach(this::resolveAudioUrl));
-        }
-        return songs;
+        // submit each song as its own task — 5 threads run in parallel
+        unresolved.forEach(song -> executor.submit(() -> resolveAudioUrl(song)));
+        return ResponseEntity.ok("Resolving " + unresolved.size() + " songs in background");
     }
 
     // GET single song
