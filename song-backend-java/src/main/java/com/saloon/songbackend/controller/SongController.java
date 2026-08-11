@@ -22,10 +22,10 @@ public class SongController {
         this.repository = repository;
     }
 
-    // GET all songs
+    // GET all songs filtered by theme
     @GetMapping
-    public List<Song> getAllSongs() {
-        return repository.findAllByOrderByIdAsc();
+    public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "vintage") String theme) {
+        return repository.findByThemeOrderByPositionAsc(theme);
     }
 
     // GET single song

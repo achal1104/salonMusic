@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface SongRepository extends JpaRepository<Song, Long> {
     List<Song> findAllByOrderByIdAsc();
+    List<Song> findByThemeOrderByPositionAsc(String theme);
 }

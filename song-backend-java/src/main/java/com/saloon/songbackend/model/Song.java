@@ -25,6 +25,9 @@ public class Song {
     @Column(name = "audio_url")
     private String audioUrl;
 
+    @Column(name = "theme")
+    private String theme = "vintage";
+
     private Integer position = 0;
 
     public Song() {}
@@ -43,6 +46,9 @@ public class Song {
 
     public String getAudioUrl() { return audioUrl; }
     public void setAudioUrl(String audioUrl) { this.audioUrl = audioUrl; }
+
+    public String getTheme() { return theme; }
+    public void setTheme(String theme) { this.theme = theme; }
 
     public Integer getPosition() { return position; }
     public void setPosition(Integer position) { this.position = position; }
