@@ -14,6 +14,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @RestController
 @RequestMapping("/api/songs")
@@ -27,30 +29,25 @@ public class SongController {
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
 
-    // Fetch JioSaavn stream URL for a song title+artist, cache it in DB
+    // Fetch JioSaavn stream URL for a song, cache in DB
     private void resolveAudioUrl(Song song) {
         try {
-            String query = (song.getTitle() + " " + song.getArtist())
-                    .replaceAll("\\s+", "+");
+            String query = java.net.URLEncoder.encode(song.getTitle() + " " + song.getArtist(), "UTF-8");
             String apiUrl = "https://saavn.dev/api/search/songs?query=" + query + "&limit=1";
             String response = restTemplate.getForObject(apiUrl, String.class);
-            JsonNode root = objectMapper.readTree(response);
-            JsonNode results = root.path("data").path("results");
+            JsonNode results = objectMapper.readTree(response).path("data").path("results");
             if (results.isArray() && results.size() > 0) {
                 JsonNode downloadUrls = results.get(0).path("downloadUrl");
-                // pick 128kbps quality
                 String url = null;
+                // prefer 96kbps (medium) for broad device support
                 for (JsonNode u : downloadUrls) {
-                    if ("medium".equals(u.path("quality").asText())) {
-                        url = u.path("url").asText();
-                        break;
-                    }
+                    String q = u.path("quality").asText();
+                    if ("medium".equals(q) || "low".equals(q)) { url = u.path("url").asText(); break; }
                 }
-                if (url == null && downloadUrls.size() > 0) {
-                    url = downloadUrls.get(0).path("url").asText();
-                }
-                if (url != null && !url.isBlank()) {
+                if (url == null && downloadUrls.size() > 0) url = downloadUrls.get(0).path("url").asText();
+                if (url != null && !url.isBlank() && url.startsWith("http")) {
                     song.setAudioUrl(url);
                     repository.save(song);
                 }
@@ -58,16 +55,18 @@ public class SongController {
         } catch (Exception ignored) {}
     }
 
-    // GET all songs filtered by theme
+    // GET all songs filtered by theme — resolves missing URLs in background
     @GetMapping
     public List<Song> getAllSongs(@RequestParam(required = false, defaultValue = "vintage") String theme) {
         List<Song> songs = repository.findByThemeOrderByPositionAsc(theme);
-        // resolve missing audio URLs in background
-        songs.stream()
-             .filter(s -> s.getAudioUrl() == null || s.getAudioUrl().isBlank())
-             .limit(10) // resolve max 10 per request to avoid timeout
-             .forEach(this::resolveAudioUrl);
-        return repository.findByThemeOrderByPositionAsc(theme);
+        List<Song> unresolved = songs.stream()
+            .filter(s -> s.getAudioUrl() == null || s.getAudioUrl().isBlank() || !s.getAudioUrl().startsWith("http"))
+            .limit(5)
+            .toList();
+        if (!unresolved.isEmpty()) {
+            executor.submit(() -> unresolved.forEach(this::resolveAudioUrl));
+        }
+        return songs;
     }
 
     // GET single song
