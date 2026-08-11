@@ -1,9 +1,30 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Play, Pause, SkipBack, SkipForward, Music2, Headphones, Radio } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Music2, Headphones, Radio, Sparkles } from "lucide-react";
 import STATIC_PLAYLIST from "./playlist.js";
+import MODERN_PLAYLIST from "./playlistModern.js";
 
 const API_BASE = "https://rajkumar-salon-backend.onrender.com";
-const BACKGROUND_IMAGE = "/images/rajkumarsalon.jpg";
+
+// One background image per theme. Drop your own "modern salon" photo at
+// /images/modernsalon.jpg (or change the path below) — the app swaps to it
+// automatically when the toggle is switched.
+const BACKGROUND_IMAGES = {
+  vintage: "/images/rajkumarsalons.jpg",
+  modern: "/images/modernsalon.png",
+};
+
+// Salon name shown as a MOBILE-ONLY overlay on top of the hero photo.
+// This is the shop's fixed brand identity, so it stays the same regardless
+// of which theme (vintage/modern) is active — only the background photo and
+// colors change between themes, not the brand name. CSS (.dx-salon-name)
+// hides this overlay entirely on desktop/tablet and only shows it under the
+// mobile media query.
+const SALON_NAME = { title: "राजकुमार हेयर सैलून", sub: "Rajkumar Hair Salon" };
+
+const STATIC_PLAYLISTS = {
+  vintage: STATIC_PLAYLIST,
+  modern: MODERN_PLAYLIST,
+};
 
 const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   id: i,
@@ -31,6 +52,7 @@ function formatClock(d) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState("vintage"); // "vintage" | "modern"
   const [index, setIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -39,6 +61,27 @@ export default function App() {
   const [clock, setClock] = useState(() => formatClock(new Date()));
   const [onlineCount, setOnlineCount] = useState(41);
   const [playlist, setPlaylist] = useState(STATIC_PLAYLIST);
+
+  // ── Modern background crop tuner ──────────────────────────────────────
+  // Only active when the URL has ?tune=1, so it never appears for real
+  // visitors. Lets you drag the modern theme's background crop live in the
+  // browser (no code editing, no reload) instead of guessing CSS values
+  // blind. The three values are pushed into CSS custom properties that
+  // [data-theme='modern'] .dx-bg already reads from in App.css, so moving
+  // a slider repositions the actual background instantly.
+  const tuneMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tune") === "1";
+  const [tuneX, setTuneX] = useState(66);
+  const [tuneY, setTuneY] = useState(80);
+  const [tuneZoom, setTuneZoom] = useState(130);
+
+  useEffect(() => {
+    if (!tuneMode) return;
+    const root = document.documentElement;
+    root.style.setProperty("--dx-modern-bg-x", `${tuneX}%`);
+    root.style.setProperty("--dx-modern-bg-y", `${tuneY}%`);
+    root.style.setProperty("--dx-modern-bg-zoom", `${tuneZoom / 100}`);
+  }, [tuneMode, tuneX, tuneY, tuneZoom]);
+  // ─────────────────────────────────────────────────────────────────────
 
   const pageRef = useRef(null);
   const bgRef = useRef(null);
@@ -52,16 +95,28 @@ export default function App() {
   // keep ref in sync so callbacks always see latest value
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
-  // fetch playlist from backend — only songs with audio_url
+  // fetch playlist from backend whenever the theme changes — only songs with audio_url,
+  // falling back to the static per-theme playlist if the backend has nothing for it.
   useEffect(() => {
-    fetch(`${API_BASE}/api/songs`)
+    let cancelled = false;
+    fetch(`${API_BASE}/api/songs?theme=${theme}`)
       .then((res) => { if (!res.ok) throw new Error(); return res.json(); })
       .then((songs) => {
-        const withAudio = songs.filter(s => s.audioUrl);
-        if (withAudio.length) setPlaylist(withAudio);
+        if (cancelled) return;
+        const withAudio = songs.filter((s) => s.audioUrl);
+        setPlaylist(withAudio.length ? withAudio : STATIC_PLAYLISTS[theme]);
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => { if (!cancelled) setPlaylist(STATIC_PLAYLISTS[theme]); });
+    return () => { cancelled = true; };
+  }, [theme]);
+
+  // switching themes starts the new playlist fresh, paused, from track 0
+  useEffect(() => {
+    setIndex(0);
+    setIsPlaying(false);
+    setProgress(0);
+    setDuration(0);
+  }, [theme]);
 
   const track = playlist[index];
 
@@ -110,7 +165,7 @@ export default function App() {
     };
   }, []);
 
-  // load track when index changes
+  // load track when index/playlist changes
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !track?.id) return;
@@ -146,6 +201,7 @@ export default function App() {
   const handleNext = () => goTo(index + 1, isPlayingRef.current);
   const handlePrev = () => goTo(index - 1, isPlayingRef.current);
   const togglePlay = () => setIsPlaying((p) => !p);
+  const toggleTheme = () => setTheme((t) => (t === "vintage" ? "modern" : "vintage"));
 
   const handleSeek = (e) => {
     const el = progressTrackRef.current;
@@ -159,23 +215,82 @@ export default function App() {
   };
 
   const pct = Math.min(100, duration > 0 ? (progress / duration) * 100 : 0);
-  const px = (mouse.x - 0.5) * 18;
-  const py = (mouse.y - 0.5) * 10;
+  const px = (mouse.x - 0.5) * 10;
+  const py = (mouse.y - 0.5) * 6;
 
   return (
-    <div className="dx-page" ref={pageRef}>
+    <div className="dx-page" data-theme={theme} ref={pageRef}>
       <div
         ref={bgRef}
-        className="dx-bg"
+        className="dx-bg"  
         style={{
-          backgroundImage: `url(${BACKGROUND_IMAGE})`,
-          transform: `scale(1.08) translate(${-px}px, ${-py}px)`,
+          backgroundImage: `url(${BACKGROUND_IMAGES[theme]})`,
+          transform: `scale(1.02) translate(${-px}px, ${-py}px)`,
         }}
       />
+  
       <div className="dx-colorgrade" />
       <div className="dx-vignette" />
       <div className="dx-grain" />
       <div className="dx-bloom" />
+
+      {/* Salon name overlay — mobile-only (see .dx-salon-name in CSS, which
+          is display:none by default and only re-enabled under the mobile
+          media query). Fixed brand text, same on both themes. */}
+      <div className="dx-salon-name">
+        {SALON_NAME.title}
+        <span>{SALON_NAME.sub}</span>
+      </div>
+
+      {/* Crop tuner UI — only rendered with ?tune=1 in the URL. Not part of
+          the normal app experience; safe to leave in the code permanently
+          since real visitors never see it. Delete this block (and the
+          state/effect above) once you're happy with the final crop and
+          have baked the numbers into App.css directly. */}
+      {tuneMode && (
+        <div
+          style={{
+            position: "fixed",
+            left: 12,
+            bottom: 12,
+            zIndex: 999,
+            background: "rgba(0,0,0,0.82)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            borderRadius: 12,
+            padding: "12px 14px",
+            color: "#fff",
+            fontFamily: "monospace",
+            fontSize: 12,
+            width: 230,
+          }}
+        >
+          <div style={{ marginBottom: 8, opacity: 0.8 }}>
+            {theme === "modern" ? "Tuning MODERN crop" : "Switch to Modern to tune"}
+          </div>
+          <label style={{ display: "block", marginBottom: 6 }}>
+            X: {tuneX}%
+            <input type="range" min={0} max={100} value={tuneX}
+              onChange={(e) => setTuneX(Number(e.target.value))}
+              style={{ width: "100%" }} />
+          </label>
+          <label style={{ display: "block", marginBottom: 6 }}>
+            Y: {tuneY}%
+            <input type="range" min={0} max={100} value={tuneY}
+              onChange={(e) => setTuneY(Number(e.target.value))}
+              style={{ width: "100%" }} />
+          </label>
+          <label style={{ display: "block", marginBottom: 6 }}>
+            Zoom: {(tuneZoom / 100).toFixed(2)}x
+            <input type="range" min={100} max={220} value={tuneZoom}
+              onChange={(e) => setTuneZoom(Number(e.target.value))}
+              style={{ width: "100%" }} />
+          </label>
+          <div style={{ marginTop: 6, opacity: 0.65, lineHeight: 1.4 }}>
+            Drag until the text is gone and barber+customer are centered,
+            then send me these 3 numbers.
+          </div>
+        </div>
+      )}
 
       <svg className="dx-particles" viewBox="0 0 100 100" preserveAspectRatio="none">
         {PARTICLES.map((p) => (
@@ -185,7 +300,7 @@ export default function App() {
             cx={p.x}
             cy={p.y}
             r={p.r * 0.18}
-            fill="#f7c65a"
+            fill="var(--dx-amber)"
             opacity={p.opacity}
             style={{ animationDuration: `${p.dur}s`, animationDelay: `${p.delay}s` }}
           />
@@ -199,6 +314,15 @@ export default function App() {
           {onlineCount} online
         </div>
         <div className="dx-topbar-links">
+          <button
+            type="button"
+            className="dx-link-badge dx-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "vintage" ? "modern" : "vintage"} salon`}
+          >
+            <Sparkles size={13} />
+            <span>{theme === "vintage" ? "Modern" : "Vintage"}</span>
+          </button>
           <a href="https://open.spotify.com" target="_blank" rel="noreferrer" className="dx-link-badge">
             <Headphones size={13} /><span>Spotify</span>
           </a>

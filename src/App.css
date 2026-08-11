@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Poppins:wght@400;500;600;700&family=Yatra+One&display=swap');
 
 :root {
   --dx-ink: #0a1010;
@@ -9,11 +9,27 @@
   --dx-glass: rgba(14, 16, 18, 0.52);
   --dx-glass-border: rgba(255, 255, 255, 0.11);
   --dx-online: #4ade80;
+  --dx-colorgrade-bg: linear-gradient(160deg, rgba(178,42,34,0.16), rgba(20,10,10,0.04) 55%);
+  --dx-bloom-bg: radial-gradient(ellipse at 50% 90%, rgba(247,190,70,0.22) 0%, transparent 70%);
   --dx-radius-pill: 999px;
   --dx-safe-b: env(safe-area-inset-bottom, 0px);
   --dx-safe-t: env(safe-area-inset-top, 0px);
   --dx-safe-l: env(safe-area-inset-left, 0px);
   --dx-safe-r: env(safe-area-inset-right, 0px);
+  transition: color 0.4s ease;
+}
+
+/* ── MODERN SALON THEME ──
+   Swaps the warm vintage amber/clay palette for a cooler, contemporary one.
+   Toggled by setting data-theme="modern" on .dx-page (handled in App.jsx). */
+[data-theme='modern'] {
+  --dx-amber: #7cf7e0;
+  --dx-amber-soft: rgba(124, 247, 224, 0.85);
+  --dx-clay-1: #6366f1;
+  --dx-clay-2: #0ea5b8;
+  --dx-online: #38bdf8;
+  --dx-colorgrade-bg: linear-gradient(160deg, rgba(30,64,175,0.20), rgba(8,10,20,0.05) 55%);
+  --dx-bloom-bg: radial-gradient(ellipse at 50% 90%, rgba(56,189,248,0.24) 0%, transparent 70%);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -43,82 +59,69 @@ body {
   touch-action: manipulation;
 }
 
-/* ── parallax background ── */
+/* ── parallax background ──
+   Position is driven by two CSS variables (--dx-bg-x / --dx-bg-y) instead of
+   dozens of hardcoded per-device widths. --dx-bg-x uses clamp() so it slides
+   smoothly and continuously as the viewport resizes — no jumps, no gaps for
+   devices that fall between two fixed breakpoints, and it "just works" on
+   any screen width rather than only the specific ones it was tested on.
+   Each theme sets its own values below, since the vintage and modern photos
+   frame their signage/subject in different parts of the image. */
+:root {
+  /* vintage: the "राजकुमार हेयर सल्लून" signage sits toward the LEFT of the
+     photo, so keep extra headroom on the low end (never let cover-cropping
+     push it past the edge) */
+  --dx-bg-x: clamp(6%, calc(-18% + 14vw), 34%);
+  --dx-bg-y: 24%;
+}
+
+[data-theme='modern'] {
+  /* modern: the shopfront signage runs across the top and is more centered,
+     so it tolerates a narrower, more centered range */
+  --dx-bg-x: clamp(30%, calc(20% + 8vw), 50%);
+  --dx-bg-y: 26%;
+}
+
 .dx-bg {
   position: absolute;
-  inset: -2%;
+  inset: -0.6%;
   background-repeat: no-repeat;
   background-size: cover;
-  /* fluid fallback: interpolates smoothly across ANY width between steps below */
-  background-position: clamp(0%, calc(-40% + 15vw), 38%) 26%;
+  background-position: var(--dx-bg-x) var(--dx-bg-y);
   will-change: transform;
-  transition: transform 0.05s linear;
+  transition: transform 0.05s linear, background-image 0.4s ease,
+              background-position 0.3s ease, top 0.3s ease, bottom 0.3s ease;
   animation: dx-kenburns 30s ease-in-out infinite alternate;
 }
 
 @keyframes dx-kenburns {
-  0%   { transform: scale(1.02) translate(0px, 0px); }
-  100% { transform: scale(1.05) translate(-4px, -3px); }
+  0%   { transform: scale(1.005) translate(0px, 0px); }
+  100% { transform: scale(1.015) translate(-2px, -1px); }
 }
 
-/* ============ DESKTOP / LAPTOP ============ */
-@media (min-width: 1025px) {
-  .dx-bg { background-position: 38% 30%; }
-}
+/* ── extra-wide desktops: recentre instead of following the mobile-leaning
+   clamp curve, so the composition doesn't drift too far right ── */
 @media (min-width: 1800px) {
-  .dx-bg { background-position: center 32%; }
+  :root { --dx-bg-x: 30%; --dx-bg-y: 26%; }
+  [data-theme='modern'] { --dx-bg-x: 46%; }
 }
 
-/* ============ TABLETS (portrait + landscape, incl. iPad Pro / Air) ============ */
-@media (min-width: 641px) and (max-width: 1024px) {
-  .dx-bg { background-position: 32% 26%; }
-}
-@media (min-width: 641px) and (max-width: 820px) and (max-aspect-ratio: 3/4) {
-  .dx-bg { background-position: 20% 24%; }
-}
-/* larger tablets in landscape (iPad Pro 12.9", 1024–1366) */
-@media (min-width: 1025px) and (max-width: 1366px) and (max-height: 1024px) and (pointer: coarse) {
-  .dx-bg { background-position: 34% 28%; }
-}
-
-/* ============ PHONES — portrait, dense width steps ============ */
-/* covers virtually every Samsung/Vivo/Oppo/Xiaomi/OnePlus/Realme/iPhone width */
-@media (max-aspect-ratio: 4/5) {
-  .dx-bg { background-position: 8% 26%; }               /* generic fallback */
-}
-@media (max-width: 500px) and (min-width: 461px) { .dx-bg { background-position: 10% 26%; } } /* large phablets */
-@media (max-width: 460px) and (min-width: 431px) { .dx-bg { background-position: 7% 26%; } }  /* S24 Ultra, Vivo X/V-series large */
-@media (max-width: 430px) and (min-width: 415px) { .dx-bg { background-position: 5% 25%; } }  /* iPhone Pro Max, Vivo Y100 class */
-@media (max-width: 414px) and (min-width: 401px) { .dx-bg { background-position: 4% 25%; } }  /* Galaxy S20/S21+, Vivo V-series */
-@media (max-width: 400px) and (min-width: 391px) { .dx-bg { background-position: 3% 25%; } }  /* Galaxy S22/S23, Pixel */
-@media (max-width: 390px) and (min-width: 377px) { .dx-bg { background-position: 2% 24%; } }  /* iPhone 13-15, common Android */
-@media (max-width: 376px) and (min-width: 361px) { .dx-bg { background-position: 1% 24%; } }  /* Galaxy S8-S10, Vivo Y-series budget */
-@media (max-width: 360px) and (min-width: 341px) { .dx-bg { background-position: 0% 23%; } }  /* baseline Android (very common) */
-@media (max-width: 340px) and (min-width: 321px) { .dx-bg { background-position: 0% 22%; } }  /* compact/budget phones */
-@media (max-width: 320px) { .dx-bg { background-position: 0% 20%; } }                         /* smallest (SE, folds, entry Vivo Y) */
-/* very narrow folded phones (Galaxy Fold cover screen, ~280px) */
-@media (max-width: 290px) { .dx-bg { background-position: 0% 18%; } }
-
-/* ============ PHONES — landscape ============ */
+/* ── phone landscape: image is short and wide, pull position back toward
+   center vertically so the subject isn't cropped out entirely ── */
 @media (max-height: 480px) and (orientation: landscape) {
-  .dx-bg { background-position: 25% 30%; }
+  :root { --dx-bg-x: 18%; --dx-bg-y: 30%; }
+  [data-theme='modern'] { --dx-bg-x: 40%; --dx-bg-y: 30%; }
 }
-@media (max-height: 375px) and (orientation: landscape) {
-  .dx-bg { background-position: 22% 28%; }
-}
-
-/* ============ TALL-SCREEN PHONES (21:9, common on Samsung/Vivo/Sony) ============ */
-@media (max-aspect-ratio: 9/20) {
-  .dx-bg { background-position: 0% 20%; }
-}
-/* ── warm color grade — lifts a cool/teal photo toward warm amber-red ── */
+/* ── warm color grade — lifts a cool/teal photo toward warm amber-red (or, in
+   modern theme, toward cool blue) via the --dx-colorgrade-bg variable ── */
 .dx-colorgrade {
   position: absolute;
   inset: 0;
-  background: linear-gradient(160deg, rgba(178,42,34,0.16), rgba(20,10,10,0.04) 55%);
+  background: var(--dx-colorgrade-bg);
   mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 1;
+  transition: background 0.4s ease;
 }
 
 /* ── cinematic vignette ── */
@@ -143,17 +146,18 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ── amber light bloom (doorway glow) ── */
+/* ── amber light bloom (doorway glow) — becomes a cool glow in modern theme ── */
 .dx-bloom {
   position: absolute;
   left: 20%;
   right: 20%;
   bottom: 8%;
   height: 42%;
-  background: radial-gradient(ellipse at 50% 90%, rgba(247,190,70,0.22) 0%, transparent 70%);
+  background: var(--dx-bloom-bg);
   pointer-events: none;
   z-index: 3;
   animation: dx-bloom-breathe 4s ease-in-out infinite;
+  transition: background 0.4s ease;
 }
 
 @keyframes dx-bloom-breathe {
@@ -174,6 +178,7 @@ body {
 .dx-particle {
   animation: dx-float linear infinite;
   will-change: transform, opacity;
+  transition: fill 0.4s ease;
 }
 
 @keyframes dx-float {
@@ -235,6 +240,7 @@ body {
   box-shadow: 0 0 6px rgba(74,222,128,0.8);
   animation: dx-dot-pulse 1.8s ease-in-out infinite;
   flex-shrink: 0;
+  transition: background 0.4s ease;
 }
 
 @keyframes dx-dot-pulse {
@@ -278,6 +284,19 @@ body {
   outline-offset: 2px;
 }
 
+/* ── theme toggle button — same pill styling as the streaming badges, but a
+   real <button> and given a subtle amber/teal accent so it reads as an action ── */
+.dx-theme-toggle {
+  cursor: pointer;
+  color: var(--dx-amber-soft);
+  border-color: rgba(255,255,255,0.14);
+}
+
+.dx-theme-toggle:hover {
+  border-color: var(--dx-amber-soft);
+  background: rgba(255,255,255,0.14);
+}
+
 /* on wide screens the online pill sits inline between clock and links again */
 @media (min-width: 561px) {
   .dx-topbar-online { order: 0; flex: 0 0 auto; margin: 0; }
@@ -307,7 +326,7 @@ body {
   align-items: center;
   gap: 14px;
   width: 100%;
-  max-width: clamp(320px, 34vw, 480px);
+  max-width: min(calc(100% - 24px), 480px);
   background: var(--dx-glass);
   backdrop-filter: blur(14px) saturate(1.4);
   -webkit-backdrop-filter: blur(14px) saturate(1.4);
@@ -381,7 +400,7 @@ body {
   overflow: hidden;
   color: #fbf3e4;
   box-shadow: 0 0 0 0 rgba(247,198,90,0);
-  transition: box-shadow 0.5s ease;
+  transition: box-shadow 0.5s ease, background 0.4s ease;
 }
 
 .dx-album-art img {
@@ -403,7 +422,11 @@ body {
 }
 
 /* ── track info ── */
-.dx-player-body { flex: 1; min-width: 0; }
+.dx-player-body { 
+  flex: 1; 
+  min-width: 0; 
+  overflow: hidden; /* ADDED: Forces flex child to respect container width */
+}
 
 .dx-track-title {
   display: flex;
@@ -416,6 +439,15 @@ body {
   color: #fff;
   letter-spacing: 0.2px;
   min-width: 0;
+  overflow: hidden; /* ADDED: Prevents long titles from blowing out the card width */
+  transition: font-family 0.2s ease, font-style 0.2s ease;
+}
+
+/* modern theme: crisp upright sans instead of the vintage italic serif */
+[data-theme='modern'] .dx-track-title {
+  font-family: "Poppins", sans-serif;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .dx-track-title-text {
@@ -441,6 +473,7 @@ body {
   background: var(--dx-amber);
   transform-origin: bottom;
   animation: dx-eq-bounce ease-in-out infinite;
+  transition: background 0.4s ease;
 }
 
 .dx-eq span:nth-child(1) { height: 35%; animation-duration: 0.7s; animation-delay: -0.3s; }
@@ -482,8 +515,12 @@ body {
   height: 100%;
   background: linear-gradient(90deg, #c48a20, var(--dx-amber), #fff9e6);
   border-radius: 4px;
-  transition: width 1s linear;
+  transition: width 1s linear, background 0.4s ease;
   pointer-events: none;
+}
+
+[data-theme='modern'] .dx-progress-fill {
+  background: linear-gradient(90deg, #2563eb, var(--dx-amber), #ecfeff);
 }
 
 .dx-progress-dot {
@@ -555,9 +592,17 @@ body {
               background 0.2s ease, opacity 0.2s ease;
 }
 
+[data-theme='modern'] .dx-btn--play {
+  background: linear-gradient(135deg, rgba(124,247,224,0.28), rgba(255,255,255,0.1));
+}
+
 .dx-btn--play:hover {
   background: linear-gradient(135deg, rgba(247,198,90,0.4), rgba(255,255,255,0.16));
   transform: scale(1.14);
+}
+
+[data-theme='modern'] .dx-btn--play:hover {
+  background: linear-gradient(135deg, rgba(124,247,224,0.4), rgba(255,255,255,0.16));
 }
 
 .dx-btn:focus-visible {
@@ -597,18 +642,40 @@ body {
 
 /* ── phones ── */
 @media (max-width: 640px) {
-  .dx-player-wrap { padding: 0 16px; bottom: calc(20px + var(--dx-safe-b)); }
+  /* trimmed from 20px — claws back a little vertical room from the gap
+     below the (full, uncropped) hero photo without crowding the card */
+  .dx-player-wrap { padding: 0 16px; bottom: calc(12px + var(--dx-safe-b)); }
   .dx-player-card {
     max-width: 100%;
     padding: 10px 14px 10px 10px;
     gap: 12px;
   }
-  .dx-topbar { padding: calc(16px + var(--dx-safe-t)) 16px 0; }
+  /* trimmed from 16px — claws back a little vertical room above the hero
+     photo without crowding the clock/badges */
+  .dx-topbar { padding: calc(10px + var(--dx-safe-t)) 16px 10px; }
   .dx-topbar-links { gap: 6px; }
   .dx-link-badge { padding: 7px 11px; }
   .dx-link-badge span:not(.dx-eq) { display: none; }
   .dx-btn { width: 40px; height: 40px; }
   .dx-btn--play { width: 44px; height: 44px; }
+
+  /* Desktop topbar is a transparent row of floating pill badges. On mobile
+     it reads better as one unified navbar strip — same glass material as
+     the player card, with a thin warm gold underline so it reads as
+     "Rajkumar" branding rather than a generic dark bar. Position stays
+     `absolute` (matching the existing rule above) rather than switching to
+     `fixed`, since `.dx-page` is already the full-viewport scroll
+     container and everything else here is positioned the same way. */
+  .dx-topbar {
+    background: linear-gradient(180deg, rgba(10,14,14,0.55), rgba(10,14,14,0.15) 85%, transparent);
+    border-bottom: 1px solid rgba(247,198,90,0.16);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+
+  [data-theme='modern'] .dx-topbar {
+    border-bottom-color: rgba(124,247,224,0.16);
+  }
 }
 
 @media (max-width: 380px) {
@@ -634,4 +701,135 @@ body {
   .dx-player-wrap { bottom: calc(10px + var(--dx-safe-b)); }
   .dx-player-card { padding: 6px 14px 6px 6px; }
   .dx-track-artist { margin-bottom: 4px; }
+}
+
+/* =========================================================
+   SALON NAME OVERLAY — MOBILE ONLY, BOTH THEMES
+   Hidden by default everywhere (desktop + tablet, both themes), so the
+   background images' own baked-in signage never doubles up with this.
+   Re-enabled for both vintage and modern once the phone media query
+   kicks in — the modern background-position rule below is tuned to crop
+   its baked-in text out of frame first, so this HTML text is the only
+   thing rendered in that top area on mobile for either theme.
+   ========================================================= */
+.dx-salon-name {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .dx-salon-name {
+    display: flex;
+    position: absolute;
+    /* fixed px offset (not %) because the mobile topbar's height is
+       roughly constant (clock row + wrapped online-count pill row on
+       narrow screens) regardless of viewport height, so this clearance
+       holds correctly across 360×740, 375×812, 390×844, 414×896 alike */
+    top: calc(92px + var(--dx-safe-t));
+    left: 50%;
+    transform: translateX(-50%);
+
+    width: 100%;
+    padding: 0 16px;
+    z-index: 7;
+
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    color: #ffffff;
+
+    font-family: "Fraunces", serif;
+    font-size: clamp(24px, 7.5vw, 32px);
+    font-weight: 600;
+
+    line-height: 1;
+    text-align: center;
+    letter-spacing: 1px;
+    word-break: break-word;
+
+    text-shadow:
+      0 2px 5px rgba(0, 0, 0, 0.95),
+      0 5px 18px rgba(0, 0, 0, 0.8);
+
+    pointer-events: none;
+  }
+
+  .dx-salon-name span {
+    display: block;
+    margin-top: 6px;
+
+    font-family: "Poppins", sans-serif;
+    font-size: 0.42em;
+    font-weight: 600;
+
+    letter-spacing: 3px;
+    line-height: 1;
+
+    text-transform: uppercase;
+  }
+}
+
+/* =========================================================
+   MOBILE HERO FRAMING (mobile only — desktop --dx-bg-x/--dx-bg-y rules
+   above are untouched)
+   Both source photos have text baked directly into the image itself
+   ("Nostalgic barbers bangers" on the vintage photo, "RAJKUMAR HAIR
+   SALOON" + a decorative pattern on the modern photo), sitting above the
+   barber/customer scene.
+
+   `background-size: cover` + `background-position: center center` shows a
+   full-height vertical slice of each (landscape) photo, horizontally
+   centered. The extra `transform: scale()` below zooms in further from
+   that centered slice, anchored via `transform-origin` toward wherever the
+   barber + customer actually sit in each specific photo — vintage's scene
+   is centered/slightly-low, modern's barber+customer chairs sit right of
+   center, so the origin differs per theme. This only ever crops further
+   inward (never leaves a gap) and scales proportionally across phone
+   aspect ratios without per-device values.
+   ========================================================= */
+@media (max-width: 640px) {
+  .dx-bg {
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-color: var(--dx-ink);
+    animation: none !important;
+    transition: background-image 0.4s ease, background-position 0.3s ease,
+                transform 0.3s ease;
+  }
+
+  /* `!important` overrides the inline parallax transform from App.jsx.
+     That effect is already inert on touch devices (its useEffect exits
+     early on `hover: none`), so this only changes mobile framing — it
+     doesn't touch the JSX or the desktop parallax behavior. */
+  [data-theme='vintage'] .dx-bg {
+    transform: scale(1.6) !important;
+    transform-origin: 50% 78%;
+  }
+
+  /* Modern: driven by three CSS custom properties (x, y, zoom) so they can
+     be tuned live via the ?tune=1 debug panel in App.jsx instead of more
+     blind guessing on my end. Defaults below are a starting point — open
+     the app with ?tune=1 added to the URL, switch to Modern, and drag the
+     sliders until the baked-in text is fully out of frame and the barber
+     + customer are centered. Then tell me the final numbers (or edit the
+     three --dx-modern-bg-* values below directly) to make it permanent.
+
+     Note on why some zoom is unavoidable: with background-size: cover on
+     a tall narrow phone screen, the image's full height is always visible
+     by default (nothing to crop vertically) — only left/right panning is
+     possible. To push a text band that runs across the top out of the
+     visible area, some vertical zoom beyond that default is required;
+     "zoomed out" here means less than previous attempts, not zero. */
+  :root {
+    --dx-modern-bg-x: 66%;
+    --dx-modern-bg-y: 80%;
+    --dx-modern-bg-zoom: 1.3;
+  }
+
+  [data-theme='modern'] .dx-bg {
+    background-position: var(--dx-modern-bg-x) var(--dx-modern-bg-y) !important;
+    transform: scale(var(--dx-modern-bg-zoom)) !important;
+    transform-origin: var(--dx-modern-bg-x) var(--dx-modern-bg-y);
+  }
 }
