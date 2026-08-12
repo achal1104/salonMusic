@@ -12,12 +12,22 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/songs")
@@ -96,6 +106,25 @@ public class SongController {
         return repository.findByThemeOrderByPositionAsc(theme);
     }
 
+    // POST create a new song (adds to DB list only)
+    @PostMapping
+    public ResponseEntity<Song> createSong(@RequestBody Song input) {
+        try {
+            Song s = new Song();
+            s.setTitle(input.getTitle());
+            s.setArtist(input.getArtist() == null || input.getArtist().isBlank() ? "Unknown" : input.getArtist());
+            s.setAudioUrl(input.getAudioUrl());
+            s.setTheme(input.getTheme() == null || input.getTheme().isBlank() ? "vintage" : input.getTheme());
+            // determine next position
+            int maxPos = repository.findAll().stream().map(Song::getPosition).max(java.util.Comparator.naturalOrder()).orElse(0);
+            s.setPosition(maxPos + 1);
+            Song saved = repository.save(s);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
     // POST resolve all missing audio URLs — call once to seed everything
     @PostMapping("/resolve-all")
     public ResponseEntity<String> resolveAll() {
@@ -144,6 +173,42 @@ public class SongController {
             return ResponseEntity.ok(added);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Collections.emptyList());
+        }
+    }
+
+    // Upload local mp3 files from client and add DB rows (stores files in server temp dir)
+    @PostMapping(path = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<Song>> uploadSongs(@RequestParam("files") MultipartFile[] files) {
+        try {
+            Path outDir = Paths.get(System.getProperty("java.io.tmpdir"), "uploads");
+            Files.createDirectories(outDir);
+            java.util.List<Song> all = repository.findAll();
+            int maxPos = all.stream().map(Song::getPosition).max(Comparator.naturalOrder()).orElse(0);
+            java.util.List<Song> added = new ArrayList<>();
+            for (MultipartFile f : files) {
+                if (f == null || f.isEmpty()) continue;
+                String filename = StringUtils.cleanPath(f.getOriginalFilename());
+                Path out = outDir.resolve(filename);
+                try (InputStream in = f.getInputStream()) {
+                    Files.copy(in, out, StandardCopyOption.REPLACE_EXISTING);
+                }
+                String title = filename.replaceFirst("\\.[^.]+$", "");
+                boolean exists = all.stream().anyMatch(s -> out.toString().equals(s.getAudioUrl()) || title.equalsIgnoreCase(s.getTitle()));
+                if (!exists) {
+                    Song s = new Song();
+                    s.setTitle(title);
+                    s.setArtist("Unknown");
+                    s.setAudioUrl(out.toString());
+                    s.setTheme("vintage");
+                    s.setPosition(++maxPos);
+                    repository.save(s);
+                    added.add(s);
+                    all.add(s);
+                }
+            }
+            return ResponseEntity.ok(added);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.emptyList());
         }
     }
 
