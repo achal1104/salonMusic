@@ -33,6 +33,9 @@ public class SongController {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ExecutorService executor = Executors.newFixedThreadPool(5);
 
+    @org.springframework.beans.factory.annotation.Value("${songs.download.dir:}")
+    private String downloadsDir;
+
     // Fetch JioSaavn stream URL for a song, cache in DB
     private void resolveAudioUrl(Song song) {
         try {
@@ -104,6 +107,46 @@ public class SongController {
         return ResponseEntity.ok("Resolving " + unresolved.size() + " songs in background");
     }
 
+    // POST scan a local downloads folder for new .mp3 files and add to DB
+    @PostMapping("/scan-downloads")
+    public ResponseEntity<List<Song>> scanDownloads() {
+        try {
+            String dir = downloadsDir;
+            if (dir == null || dir.isBlank()) {
+                dir = java.nio.file.Paths.get(System.getProperty("user.home"), "Downloads").toString();
+            }
+            java.io.File folder = new java.io.File(dir);
+            if (!folder.exists() || !folder.isDirectory()) return ResponseEntity.badRequest().body(java.util.Collections.emptyList());
+
+            java.util.List<Song> added = new java.util.ArrayList<>();
+            java.util.List<Song> all = repository.findAll();
+            int maxPos = all.stream().map(Song::getPosition).max(java.util.Comparator.naturalOrder()).orElse(0);
+
+            java.io.FilenameFilter filter = (d, name) -> name.toLowerCase().endsWith(".mp3");
+            java.io.File[] files = folder.listFiles(filter);
+            if (files == null) return ResponseEntity.ok(added);
+            for (java.io.File f : files) {
+                String abs = f.getAbsolutePath();
+                String base = f.getName();
+                String title = base.replaceFirst("\\\\.[^.]+$", "");
+                boolean exists = all.stream().anyMatch(s -> abs.equals(s.getAudioUrl()) || title.equalsIgnoreCase(s.getTitle()));
+                if (!exists) {
+                    Song s = new Song();
+                    s.setTitle(title);
+                    s.setArtist("Unknown");
+                    s.setAudioUrl(abs);
+                    s.setTheme("vintage");
+                    s.setPosition(++maxPos);
+                    repository.save(s);
+                    added.add(s);
+                }
+            }
+            return ResponseEntity.ok(added);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Collections.emptyList());
+        }
+    }
+
     // GET single song
     @GetMapping("/{id}")
     public ResponseEntity<Song> getSong(@PathVariable Long id) {
@@ -112,21 +155,44 @@ public class SongController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // GET audio — serves mp3 from static/audio/
+    // GET audio — serves mp3 from classpath static/audio/, filesystem path, or redirects to remote URL
     @GetMapping("/{id}/audio")
-    public ResponseEntity<Resource> getAudio(@PathVariable Long id) {
+    public ResponseEntity<?> getAudio(@PathVariable Long id) {
         return repository.findById(id)
                 .filter(s -> s.getAudioUrl() != null && !s.getAudioUrl().isBlank())
                 .map(s -> {
                     try {
-                        String filename = s.getAudioUrl();
-                        Resource resource = new ClassPathResource("static/audio/" + filename);
-                        if (!resource.exists()) return ResponseEntity.notFound().<Resource>build();
-                        return ResponseEntity.ok()
-                                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                                .body(resource);
+                        String audio = s.getAudioUrl();
+                        Resource resource = null;
+                        // Try classpath static audio (stored as filename)
+                        if (!audio.startsWith("http") && !audio.contains(":") && !audio.startsWith("/") && !audio.startsWith("\\\\")) {
+                            resource = new ClassPathResource("static/audio/" + audio);
+                            if (resource.exists()) {
+                                return ResponseEntity.ok()
+                                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + audio + "\"")
+                                        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                                        .contentType(MediaType.parseMediaType("audio/mpeg"))
+                                        .body(resource);
+                            }
+                        }
+                        // Try filesystem path
+                        java.nio.file.Path p = java.nio.file.Paths.get(audio);
+                        if (java.nio.file.Files.exists(p)) {
+                            resource = new org.springframework.core.io.PathResource(p);
+                            String filename = p.getFileName().toString();
+                            return ResponseEntity.ok()
+                                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                                    .contentType(MediaType.parseMediaType("audio/mpeg"))
+                                    .body(resource);
+                        }
+                        // If remote URL, redirect client to it (so play starts immediately)
+                        if (audio.startsWith("http")) {
+                            return ResponseEntity.status(HttpStatus.FOUND)
+                                    .header(HttpHeaders.LOCATION, audio)
+                                    .build();
+                        }
+                        return ResponseEntity.notFound().<Resource>build();
                     } catch (Exception e) {
                         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<Resource>build();
                     }
