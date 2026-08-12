@@ -70,10 +70,15 @@ export default function App() {
   // blind. The three values are pushed into CSS custom properties that
   // [data-theme='modern'] .dx-bg already reads from in App.css, so moving
   // a slider repositions the actual background instantly.
-  const tuneMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tune") === "1";
+ const tuneMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tune") === "1";
+  // modern theme tuning
   const [tuneX, setTuneX] = useState(66);
   const [tuneY, setTuneY] = useState(80);
   const [tuneZoom, setTuneZoom] = useState(130);
+  // vintage theme tuning
+  const [tuneVX, setTuneVX] = useState(50);
+  const [tuneVY, setTuneVY] = useState(78);
+  const [tuneVZoom, setTuneVZoom] = useState(160);
 
   useEffect(() => {
     if (!tuneMode) return;
@@ -82,6 +87,14 @@ export default function App() {
     root.style.setProperty("--dx-modern-bg-y", `${tuneY}%`);
     root.style.setProperty("--dx-modern-bg-zoom", `${tuneZoom / 100}`);
   }, [tuneMode, tuneX, tuneY, tuneZoom]);
+
+  useEffect(() => {
+    if (!tuneMode) return;
+    const root = document.documentElement;
+    root.style.setProperty("--dx-vintage-bg-x", `${tuneVX}%`);
+    root.style.setProperty("--dx-vintage-bg-y", `${tuneVY}%`);
+    root.style.setProperty("--dx-vintage-bg-zoom", `${tuneVZoom / 100}`);
+  }, [tuneMode, tuneVX, tuneVY, tuneVZoom]);
   // ─────────────────────────────────────────────────────────────────────
 
   const pageRef = useRef(null);
@@ -323,26 +336,54 @@ export default function App() {
           }}
         >
           <div style={{ marginBottom: 8, opacity: 0.8 }}>
-            {theme === "modern" ? "Tuning MODERN crop" : "Switch to Modern to tune"}
+            Tuning {theme === "modern" ? "MODERN" : "VINTAGE"} crop
+            {" "}(toggle theme button above to switch)
           </div>
-          <label style={{ display: "block", marginBottom: 6 }}>
-            X: {tuneX}%
-            <input type="range" min={0} max={100} value={tuneX}
-              onChange={(e) => setTuneX(Number(e.target.value))}
-              style={{ width: "100%" }} />
-          </label>
-          <label style={{ display: "block", marginBottom: 6 }}>
-            Y: {tuneY}%
-            <input type="range" min={0} max={100} value={tuneY}
-              onChange={(e) => setTuneY(Number(e.target.value))}
-              style={{ width: "100%" }} />
-          </label>
-          <label style={{ display: "block", marginBottom: 6 }}>
-            Zoom: {(tuneZoom / 100).toFixed(2)}x
-            <input type="range" min={100} max={220} value={tuneZoom}
-              onChange={(e) => setTuneZoom(Number(e.target.value))}
-              style={{ width: "100%" }} />
-          </label>
+
+          {theme === "vintage" ? (
+            <>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                X: {tuneVX}%
+                <input type="range" min={0} max={100} value={tuneVX}
+                  onChange={(e) => setTuneVX(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                Y: {tuneVY}%
+                <input type="range" min={0} max={100} value={tuneVY}
+                  onChange={(e) => setTuneVY(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                Zoom: {(tuneVZoom / 100).toFixed(2)}x
+                <input type="range" min={100} max={220} value={tuneVZoom}
+                  onChange={(e) => setTuneVZoom(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+            </>
+          ) : (
+            <>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                X: {tuneX}%
+                <input type="range" min={0} max={100} value={tuneX}
+                  onChange={(e) => setTuneX(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                Y: {tuneY}%
+                <input type="range" min={0} max={100} value={tuneY}
+                  onChange={(e) => setTuneY(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+              <label style={{ display: "block", marginBottom: 6 }}>
+                Zoom: {(tuneZoom / 100).toFixed(2)}x
+                <input type="range" min={100} max={220} value={tuneZoom}
+                  onChange={(e) => setTuneZoom(Number(e.target.value))}
+                  style={{ width: "100%" }} />
+              </label>
+            </>
+          )}
+
           <div style={{ marginTop: 6, opacity: 0.65, lineHeight: 1.4 }}>
             Drag until the text is gone and barber+customer are centered,
             then send me these 3 numbers.
