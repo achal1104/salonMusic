@@ -820,7 +820,8 @@ body {
     /* Mobile-only vintage photo — overrides the inline backgroundImage
        from App.jsx (desktop keeps using rajkumarsalons.jpg via JS;
        this swaps it just for screens ≤640px). */
-    background-image: url(/images/rajkumarvintage.png) !important;
+    background-image: url(/images/rajkumarsalonsalman.png) !important;
+   
     background-position: var(--dx-vintage-bg-x) var(--dx-vintage-bg-y) !important;
     transform: scale(var(--dx-vintage-bg-zoom)) !important;
     transform-origin: var(--dx-vintage-bg-x) var(--dx-vintage-bg-y);
@@ -840,16 +841,17 @@ body {
      visible area, some vertical zoom beyond that default is required;
      "zoomed out" here means less than previous attempts, not zero. */
   :root {
-    /* Zoomed out further + recentered — previous values were still
-       cropping too tight, pushing the barber to the edge and letting the
-       bottom signboard creep into frame. */
-    --dx-vintage-bg-x: 45%;
-    --dx-vintage-bg-y: 48%;
-    --dx-vintage-bg-zoom: 1.0;
+  --dx-vintage-bg-x: 45%;
+   --dx-vintage-bg-y: 32%;      /* was 8% — moves the origin down, away from
+                                   the scissors icon, so zoom doesn't punt
+                                   it out of frame */
+    --dx-vintage-bg-zoom: 1.15; /* was 1.12 — less aggressive zoom, just
+                                   enough to still trim the lamp without
+                                   over-cropping the scissors above it */
     --dx-modern-bg-x: 66%;
-    --dx-modern-bg-y: 80%;
-    --dx-modern-bg-zoom: 1.3;
-  }
+  --dx-modern-bg-y: 80%;
+  --dx-modern-bg-zoom: 1.3;
+}
   [data-theme='modern'] .dx-bg {
     background-position: var(--dx-modern-bg-x) var(--dx-modern-bg-y) !important;
     transform: scale(var(--dx-modern-bg-zoom)) !important;
