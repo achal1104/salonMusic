@@ -220,46 +220,54 @@ public class SongController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // GET audio — serves mp3 from classpath static/audio/, filesystem path, or redirects to remote URL
+    // GET audio — streams mp3 with range support for fast start
     @GetMapping("/{id}/audio")
-    public ResponseEntity<?> getAudio(@PathVariable Long id) {
+    public ResponseEntity<?> getAudio(@PathVariable Long id,
+            @RequestHeader(value = "Range", required = false) String rangeHeader) {
         return repository.findById(id)
                 .filter(s -> s.getAudioUrl() != null && !s.getAudioUrl().isBlank())
                 .map(s -> {
                     try {
                         String audio = s.getAudioUrl();
                         Resource resource = null;
-                        // Try classpath static audio (stored as filename)
-                        if (!audio.startsWith("http") && !audio.contains(":") && !audio.startsWith("/") && !audio.startsWith("\\\\")) {
+                        if (!audio.startsWith("http") && !audio.contains(":") && !audio.startsWith("/")) {
                             resource = new ClassPathResource("static/audio/" + audio);
-                            if (resource.exists()) {
-                                return ResponseEntity.ok()
-                                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + audio + "\"")
+                            if (!resource.exists()) return ResponseEntity.notFound().build();
+                        } else if (audio.startsWith("http")) {
+                            return ResponseEntity.status(HttpStatus.FOUND)
+                                    .header(HttpHeaders.LOCATION, audio).build();
+                        } else {
+                            java.nio.file.Path p = java.nio.file.Paths.get(audio);
+                            if (!java.nio.file.Files.exists(p)) return ResponseEntity.notFound().build();
+                            resource = new org.springframework.core.io.PathResource(p);
+                        }
+                        long contentLength = resource.contentLength();
+                        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                            String[] parts = rangeHeader.substring(6).split("-");
+                            long start = Long.parseLong(parts[0]);
+                            long end = parts.length > 1 && !parts[1].isEmpty()
+                                    ? Long.parseLong(parts[1]) : contentLength - 1;
+                            end = Math.min(end, contentLength - 1);
+                            long rangeLength = end - start + 1;
+                            try (InputStream in = resource.getInputStream()) {
+                                in.skip(start);
+                                byte[] data = in.readNBytes((int) rangeLength);
+                                return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                                        .header(HttpHeaders.CONTENT_TYPE, "audio/mpeg")
                                         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                                        .contentType(MediaType.parseMediaType("audio/mpeg"))
-                                        .body(resource);
+                                        .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + contentLength)
+                                        .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(rangeLength))
+                                        .body(data);
                             }
                         }
-                        // Try filesystem path
-                        java.nio.file.Path p = java.nio.file.Paths.get(audio);
-                        if (java.nio.file.Files.exists(p)) {
-                            resource = new org.springframework.core.io.PathResource(p);
-                            String filename = p.getFileName().toString();
-                            return ResponseEntity.ok()
-                                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                                    .contentType(MediaType.parseMediaType("audio/mpeg"))
-                                    .body(resource);
-                        }
-                        // If remote URL, redirect client to it (so play starts immediately)
-                        if (audio.startsWith("http")) {
-                            return ResponseEntity.status(HttpStatus.FOUND)
-                                    .header(HttpHeaders.LOCATION, audio)
-                                    .build();
-                        }
-                        return ResponseEntity.notFound().<Resource>build();
+                        return ResponseEntity.ok()
+                                .header(HttpHeaders.CONTENT_TYPE, "audio/mpeg")
+                                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                                .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(contentLength))
+                                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                                .body(resource);
                     } catch (Exception e) {
-                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).<Resource>build();
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
                     }
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
